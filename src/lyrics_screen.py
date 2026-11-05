@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
     "idle_crop": None,
     "frost": False,
     "frost_radius": 7,
-    "accent": "#4D6BFE",
+    "accent": "#8B5CF6",
     "scenes": {"lyrics": True, "info": True},
     "city": "上海",
     "cover_bg": True,

@@ -19,18 +19,18 @@ import lyrics_screen
 from ui_crop import CropDialog, preview_thumb
 
 # ------------------------------------------------------------------ palette
-BG = "#08090D"
-SIDEBAR = "#0B0D12"
-CARD = "#131722"
-CARD_HI = "#1A1F2E"
-FG = "#F2F4F8"
-MUTED = "#8A93A6"
-DIM = "#6E778A"
-ACCENT = "#4D6BFE"
-ACCENT_DARK = "#3A55D9"
-MINT = "#00D6A4"
-DANGER = "#FF5C5C"
-BORDER = "#1E2433"
+BG = "#0C0A14"
+SIDEBAR = "#14101F"
+CARD = "#1A1528"
+CARD_HI = "#241B38"
+FG = "#F4F1FA"
+MUTED = "#A49BB8"
+DIM = "#6F6584"
+ACCENT = "#8B5CF6"
+ACCENT_DARK = "#6D28D9"
+MINT = "#34D399"
+DANGER = "#FF5C6C"
+BORDER = "#2C2340"
 
 FONT = "Microsoft YaHei UI"
 
@@ -152,9 +152,9 @@ class FakeScreen:
 
 
 PRESETS = {
-    "dark": dict(bg="#08090D", sidebar="#0B0D12", card="#131722", card_hi="#1A1F2E",
-                 fg="#F2F4F8", muted="#8A93A6", dim="#6E778A", accent="#4D6BFE",
-                 border="#1E2433"),
+    "dark": dict(bg="#0C0A14", sidebar="#14101F", card="#1A1528", card_hi="#241B38",
+                 fg="#F4F1FA", muted="#A49BB8", dim="#6F6584", accent="#8B5CF6",
+                 border="#2C2340"),
     "red": dict(bg="#0B0A0C", sidebar="#0F0C0E", card="#171114", card_hi="#20171B",
                 fg="#F7F2F3", muted="#A08F94", dim="#6B5C60", accent="#E63C3C",
                 border="#2A1D21"),
@@ -266,6 +266,10 @@ class App:
         self.events = queue.Queue()
         self.cfg = lyrics_screen.load_config()
         apply_palette(self.cfg.get("palette") or "dark")
+        # v3 palette: users who never picked a custom accent (still on the old
+        # default blue) move to the new violet accent; custom choices are kept.
+        if self.cfg.get("accent") in (None, "#4D6BFE"):
+            self.cfg["accent"] = ACCENT
         self.accent = self.cfg.get("accent") or ACCENT
         logsetup.info("app start v%s config=%s" % (
             VERSION, {k: v for k, v in self.cfg.items() if k not in ("bg_crop", "idle_crop")}))
@@ -316,15 +320,14 @@ class App:
         except Exception:
             pass
 
-        self.sidebar = tk.Frame(root, bg=SIDEBAR, width=88)
-        self.sidebar.pack(side="left", fill="y")
-        self.sidebar.pack_propagate(False)
-        self._build_sidebar()
+        self.topbar = tk.Frame(root, bg=SIDEBAR, height=64)
+        self.topbar.pack(side="top", fill="x")
+        self.topbar.pack_propagate(False)
+        self._build_topbar()
 
-        tk.Frame(root, bg=BORDER, width=1).pack(side="left", fill="y")
+        tk.Frame(root, bg=BORDER, height=1).pack(side="top", fill="x")
         self.main = tk.Frame(root, bg=BG)
-        self._build_header()
-        self.main.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+        self.main.pack(side="top", fill="both", expand=True)
 
         self.val_var = tk.BooleanVar(value=bool(self.cfg.get("valorant", False)))
         self.pages = {
@@ -338,75 +341,37 @@ class App:
         self.show_page("lyrics")
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def _build_sidebar(self):
-        # v2 shell: a narrow icon rail instead of the old 212px text sidebar.
-        # Start/Stop and device status now live in the top header.
-        side = self.sidebar
-        head = tk.Frame(side, bg=SIDEBAR)
-        head.pack(fill="x", pady=(20, 8))
+    def _build_topbar(self):
+        # v3 shell: no side rail at all. One top bar holds the brand, the
+        # page tabs in the middle, and device status + Start/Stop on the right.
+        bar = self.topbar
+        left = tk.Frame(bar, bg=SIDEBAR)
+        left.pack(side="left", padx=(22, 0), pady=12)
         try:
-            img = Image.open(ICON_PNG).resize((36, 36), Image.LANCZOS)
+            img = Image.open(ICON_PNG).resize((32, 32), Image.LANCZOS)
             self.logo_img = ImageTk.PhotoImage(img)
-            tk.Label(head, image=self.logo_img, bg=SIDEBAR).pack()
+            tk.Label(left, image=self.logo_img, bg=SIDEBAR).pack(side="left")
         except Exception:
-            tk.Label(head, text="N75", bg=SIDEBAR, fg=FG, font=(FONT, 12, "bold")).pack()
-        tk.Label(side, text="Neos75", bg=SIDEBAR, fg=FG, font=(FONT, 9, "bold")).pack()
-        tk.Label(side, text="v" + VERSION, bg=SIDEBAR, fg=DIM, font=(FONT, 8)).pack(pady=(0, 18))
+            tk.Label(left, text="N75", bg=SIDEBAR, fg=FG, font=(FONT, 12, "bold")).pack(side="left")
+        _wm = tk.Frame(left, bg=SIDEBAR)
+        _wm.pack(side="left", padx=(10, 0))
+        tk.Label(_wm, text="Neos75", bg=SIDEBAR, fg=FG, font=(FONT, 13, "bold")).pack(anchor="w")
+        tk.Label(_wm, text="屏幕助手 · v" + VERSION, bg=SIDEBAR, fg=DIM, font=(FONT, 8)).pack(anchor="w")
 
+        tabs = tk.Frame(bar, bg=SIDEBAR)
+        tabs.pack(side="left", padx=(28, 0), pady=14)
         self.nav = {}
-        for key, label, glyph in (("lyrics", "歌词", "♪"), ("game", "对局", "⚔"),
-                                  ("mon", "监控", "▤"), ("look", "外观", "◐"),
-                                  ("log", "日志", "✎"), ("fw", "固件", "⚙")):
-            row = tk.Frame(side, bg=SIDEBAR, height=64, cursor="hand2")
-            row.pack(fill="x", pady=2)
-            row.pack_propagate(False)
-            bar = tk.Frame(row, bg=SIDEBAR, width=3)
-            bar.pack(side="left", fill="y")
-            inner = tk.Frame(row, bg=SIDEBAR)
-            inner.pack(side="left", fill="both", expand=True)
-            icon = tk.Label(inner, text=glyph, bg=SIDEBAR, fg=DIM, font=(FONT, 16))
-            icon.pack(pady=(10, 0))
-            text = tk.Label(inner, text=label, bg=SIDEBAR, fg=MUTED, font=(FONT, 9))
-            text.pack()
-            for wdg in (row, inner, icon, text):
-                wdg.bind("<Button-1>", lambda e, k=key: self.show_page(k))
-                wdg.bind("<Enter>", lambda e, k=key: self._nav_hover(k, True))
-                wdg.bind("<Leave>", lambda e, k=key: self._nav_hover(k, False))
-            self.nav[key] = {"row": row, "bar": bar, "icon": icon, "text": text}
+        for key, label in (("lyrics", "歌词"), ("game", "对局"), ("mon", "监控"),
+                            ("look", "外观"), ("log", "日志"), ("fw", "固件")):
+            btn = pill(tabs, label, lambda k=key: self.show_page(k), "ghost", width=6, size=10)
+            btn.pack(side="left", padx=3)
+            btn.bind("<Enter>", lambda e, k=key: self._nav_hover(k, True))
+            btn.bind("<Leave>", lambda e, k=key: self._nav_hover(k, False))
+            self.nav[key] = {"btn": btn}
 
-        bottom = tk.Frame(side, bg=SIDEBAR)
-        bottom.pack(side="bottom", fill="x", pady=16)
-        _exit_icon = tk.Label(bottom, text="⏻", bg=SIDEBAR, fg=DIM, font=(FONT, 14), cursor="hand2")
-        _exit_icon.pack()
-        _exit_text = tk.Label(bottom, text="退出", bg=SIDEBAR, fg=DIM, font=(FONT, 9), cursor="hand2")
-        _exit_text.pack()
-        for _w in (_exit_icon, _exit_text):
-            _w.bind("<Button-1>", lambda e: self.quit())
-            _w.bind("<Enter>", lambda e: (_exit_icon.configure(fg=DANGER), _exit_text.configure(fg=DANGER)))
-            _w.bind("<Leave>", lambda e: (_exit_icon.configure(fg=DIM), _exit_text.configure(fg=DIM)))
-
-    PAGE_META = {
-        "lyrics": ("正在播放", "歌词实时上屏"),
-        "game": ("无畏契约", "对局比分实时上屏"),
-        "mon": ("电脑监控", "CPU / 内存 / 显卡 / 硬盘 / 网络"),
-        "look": ("外观", "改的是键盘屏幕上的画面"),
-        "log": ("日志", "出问题时把日志发我，能直接定位"),
-        "fw": ("屏幕固件", "歌词 / 对局 / 监控都推到这块屏幕上"),
-    }
-
-    def _build_header(self):
-        # Top header: page title on the left, device status + Start/Stop on the right.
-        head = tk.Frame(self.main, bg=BG)
-        head.pack(fill="x", padx=28, pady=(20, 0))
-        txt = tk.Frame(head, bg=BG)
-        txt.pack(side="left")
-        self.page_title = tk.Label(txt, text="正在播放", bg=BG, fg=FG, font=(FONT, 16, "bold"))
-        self.page_title.pack(anchor="w")
-        self.page_subtitle = tk.Label(txt, text="歌词实时上屏", bg=BG, fg=DIM, font=(FONT, 9))
-        self.page_subtitle.pack(anchor="w")
-        right = tk.Frame(head, bg=BG)
-        right.pack(side="right")
-        self.sync_dot = tk.Label(right, text="● 未同步", bg=BG, fg=MUTED, font=(FONT, 9, "bold"))
+        right = tk.Frame(bar, bg=SIDEBAR)
+        right.pack(side="right", padx=(18, 0), pady=14)
+        self.sync_dot = tk.Label(right, text="● 未同步", bg=SIDEBAR, fg=MUTED, font=(FONT, 9, "bold"))
         self.sync_dot.pack(side="left", padx=(0, 12))
         _dev = tk.Frame(right, bg=CARD, padx=10, pady=6)
         _dev.pack(side="left")
@@ -418,18 +383,14 @@ class App:
         self.sync_start.pack(side="left", padx=(12, 0))
         self.sync_stop = pill(right, "停止", self.stop, "danger", width=6, size=9)
         self.sync_stop.pack(side="left", padx=6)
-        tk.Frame(self.main, bg=BORDER, height=1).pack(fill="x", padx=28, pady=(14, 0))
+        _exit = pill(right, "退出", self.quit, "ghost", width=5, size=9)
+        _exit.pack(side="left", padx=(2, 0))
 
     def _nav_hover(self, key, on):
         if self.page == key:
             return
         item = self.nav[key]
-        bg = CARD_HI if on else SIDEBAR
-        for w in (item["row"], item["icon"], item["text"]):
-            w.configure(bg=bg)
-        for child in item["row"].winfo_children():
-            if isinstance(child, tk.Frame) and child is not item["bar"]:
-                child.configure(bg=bg)
+        item["btn"].config(bg=BORDER if on else CARD_HI)
 
     def _check_aula(self):
         try:
@@ -451,20 +412,11 @@ class App:
             self.root.after(120, lambda: self.refresh_log_view(again=False))
         for frame in self.pages.values():
             frame.pack_forget()
-        _title, _sub = self.PAGE_META.get(key, ("", ""))
-        self.page_title.config(text=_title)
-        self.page_subtitle.config(text=_sub)
-        self.pages[key].pack(fill="both", expand=True, padx=28, pady=(16, 18))
+        self.pages[key].pack(fill="both", expand=True, padx=36, pady=(20, 18))
         for k, item in self.nav.items():
             active = k == key
-            bg = CARD_HI if active else SIDEBAR
-            item["row"].configure(bg=bg)
-            item["icon"].configure(bg=bg, fg=self.accent if active else DIM)
-            item["text"].configure(bg=bg, fg=FG if active else MUTED)
-            for child in item["row"].winfo_children():
-                if isinstance(child, tk.Frame) and child is not item["bar"]:
-                    child.configure(bg=bg)
-            item["bar"].configure(bg=self.accent if active else SIDEBAR)
+            item["btn"].config(bg=self.accent if active else CARD_HI,
+                               fg="#FFFFFF" if active else MUTED)
         self.page = key
 
     # ---------------------------------------------------------------- lyrics
@@ -473,8 +425,8 @@ class App:
 
         head = tk.Frame(frame, bg=BG)
         head.pack(fill="x", pady=(0, 14))
-        self.track_label = tk.Label(head, text="选择播放器，点侧栏「开始」", bg=BG, fg=FG,
-                                    font=(FONT, 12, "bold"), anchor="w")
+        self.track_label = tk.Label(head, text="选择播放器，点顶栏「开始」", bg=BG, fg=FG,
+                                    font=(FONT, 14, "bold"), anchor="w")
         self.track_label.pack(anchor="w", pady=(2, 0))
 
         opts = tk.Frame(head, bg=BG)
@@ -493,10 +445,10 @@ class App:
         card.pack(fill="both", expand=True)
         body = card.body
 
-        self.line_label = tk.Label(body, text="♪", bg=CARD, fg=FG, wraplength=560,
-                                   justify="center", font=(FONT, 26, "bold"))
+        self.line_label = tk.Label(body, text="♪", bg=CARD, fg=FG, wraplength=640,
+                                   justify="center", font=(FONT, 28, "bold"))
         self.line_label.pack(fill="both", expand=True)
-        self.hint = tk.Label(body, text="点侧栏「开始」后，歌词会跟着播放自动上屏",
+        self.hint = tk.Label(body, text="点顶栏「开始」后，歌词会跟着播放自动上屏",
                              bg=CARD, fg=DIM, font=(FONT, 9))
         self.hint.pack(pady=(0, 10))
         self.next_label = tk.Label(body, text="", bg=CARD, fg=MUTED, font=(FONT, 12),
@@ -511,7 +463,7 @@ class App:
         foot.pack(fill="x", pady=(14, 0))
         pill(foot, "推送到屏幕", lambda: self.push_module_ui("lyrics"), "primary", width=12,
              accent=self.accent).pack(side="left")
-        self.sim_btn = pill(foot, "模拟屏幕", self.toggle_sim, "ghost", width=10, size=9)
+        self.sim_btn = pill(foot, "模拟屏幕", self.toggle_sim, "ghost", width=10, size=10)
         self.sim_btn.pack(side="left", padx=(10, 0))
         self.thumb = tk.Label(foot, bg=BG)
         self.thumb.pack(side="right")
@@ -543,7 +495,7 @@ class App:
             self.skin_labels.clear()
         except Exception:
             pass
-        self.sidebar.destroy()
+        self.topbar.destroy()
         self.main.destroy()
         self._build()
         self.show_page(page)
@@ -1511,11 +1463,11 @@ class App:
         win.title("模拟 Neos75 屏幕 · 480×360")
         win.configure(bg="#000000")
         win.resizable(False, False)
-        bezel = tk.Frame(win, bg="#17191f", padx=10, pady=10)
+        bezel = tk.Frame(win, bg="#171226", padx=10, pady=10)
         bezel.pack(padx=16, pady=(12, 8))
-        self.sim_label = tk.Label(bezel, bg="#000000", text="等待第一次推送…", fg="#9aa3b2")
+        self.sim_label = tk.Label(bezel, bg="#000000", text="等待第一次推送…", fg="#A49BB8")
         self.sim_label.pack()
-        self.sim_status_label = tk.Label(win, text="模拟屏幕 · 等待推送", bg="#000000", fg="#9aa3b2", font=(FONT, 9))
+        self.sim_status_label = tk.Label(win, text="模拟屏幕 · 等待推送", bg="#000000", fg="#A49BB8", font=(FONT, 9))
         self.sim_status_label.pack(pady=(0, 12))
         win.protocol("WM_DELETE_WINDOW", self.toggle_sim)
         self.sim_window = win
@@ -1572,7 +1524,7 @@ class App:
                     if "已连接" in payload:
                         self._set_device("模拟屏幕" if self.sim_enabled else "已连接", MINT)
                     elif "等待" in payload or "没有找到" in payload or "未找到" in payload:
-                        self._set_device("等待键盘", "#FFB86B")
+                        self._set_device("等待键盘", "#FBBF24")
                 elif kind == "line":
                     track, artist, current, nxt = payload
                     self.track_label.config(text=f"{track}  ·  {artist}" if artist else track)

@@ -116,8 +116,13 @@ def load_config():
 
 
 def save_config(cfg):
+    # Atomic write: write a temp file in the same directory, then
+    # replace the config, so a crash mid-write cannot leave a
+    # half-written config.json behind.
     try:
-        CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp = CONFIG_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, CONFIG_PATH)
     except Exception:
         pass
 

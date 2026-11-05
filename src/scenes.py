@@ -97,6 +97,8 @@ def cover_image(url, size=(W, H)):
             name.write_bytes(raw)
             img = Image.open(name).convert("RGB")
         img = _fit(img, size)
+        if len(_cover_cache) >= 16:
+            _cover_cache.pop(next(iter(_cover_cache)))
         _cover_cache[url] = img
         return img
     except Exception:

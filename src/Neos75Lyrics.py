@@ -18,21 +18,27 @@ import logsetup
 import lyrics_screen
 from ui_crop import CropDialog, preview_thumb
 
-# ------------------------------------------------------------------ palette
-BG = "#0C0A14"
-SIDEBAR = "#14101F"
-CARD = "#1A1528"
-CARD_HI = "#241B38"
-FG = "#F4F1FA"
-MUTED = "#A49BB8"
-DIM = "#6F6584"
-ACCENT = "#8B5CF6"
-ACCENT_DARK = "#6D28D9"
-MINT = "#34D399"
-DANGER = "#FF5C6C"
-BORDER = "#2C2340"
+# ------------------------------------------------------------------ design tokens
+# Product design system (v4): Neos75 screen control centre. Colours are the
+# spec palette; every surface, border and state colour comes from here.
+BG = "#0D111B"          # main background
+SIDEBAR = "#111827"      # left navigation
+CARD = "#1A2231"         # card background
+CARD_HI = "#222D40"      # hover / raised surface
+FG = "#F4F6FC"           # primary text
+MUTED = "#A0AEC0"        # secondary text
+DIM = "#7A8699"          # captions / disabled text
+ACCENT = "#7586FF"       # primary accent (restrained blue-violet)
+ACCENT2 = "#A78BFA"      # secondary accent
+ACCENT_DARK = "#5A6BE8"
+MINT = "#34C99A"         # success / connected
+WARN = "#F4B860"         # warning / waiting
+DANGER = "#F07178"       # error / dangerous action
+BORDER = "#26314A"       # hairline borders
 
-FONT = "Microsoft YaHei UI"
+FONT = "Microsoft YaHei UI"   # Chinese UI text
+FONT_EN = "Segoe UI Variable"  # Latin / numerals
+FONT_MONO = "Consolas"         # log viewer
 
 VERSION = "0.0.2"
 
@@ -128,6 +134,121 @@ class Card(tk.Frame):
             self.canvas.configure(height=need)
 
 
+class Icon(tk.Canvas):
+    """Lucide-style stroke icon drawn on a canvas (24x24 grid, 2px stroke).
+    tkinter has no SVG support, so icons are vector-drawn here instead of
+    emoji or bitmap glyphs. One place defines every icon, so they stay
+    visually consistent across the app."""
+
+    PATHS = {
+        "grid": [("rect", 3, 3, 9, 9), ("rect", 15, 3, 21, 9),
+                 ("rect", 3, 15, 9, 21), ("rect", 15, 15, 21, 21)],
+        "music": [("circle", 6, 18, 3), ("circle", 18, 16, 3),
+                  ("line", 9, 18, 9, 5), ("line", 21, 16, 21, 3), ("line", 9, 5, 21, 3)],
+        "trophy": [("poly", [(8, 4), (16, 4), (16, 10), (12, 13), (12, 13)], False),
+                   ("arc", 4, 5, 8, 10, 90, 180), ("arc", 16, 5, 20, 10, 270, 180),
+                   ("line", 12, 13, 12, 17), ("line", 8, 20, 16, 20), ("line", 10, 17, 14, 17)],
+        "activity": [("poly", [(3, 12), (7, 12), (10, 5), (14, 19), (17, 12), (21, 12)], False)],
+        "palette": [("circle", 12, 12, 9), ("dot", 8.5, 10, 1.1), ("dot", 12, 7.5, 1.1),
+                    ("dot", 15.5, 10, 1.1), ("dot", 15, 15.5, 1.1)],
+        "file": [("poly", [(6, 3), (14, 3), (18, 7), (18, 21), (6, 21)], True),
+                 ("line", 14, 3, 14, 7), ("line", 18, 7, 14, 7),
+                 ("line", 9, 12, 15, 12), ("line", 9, 16, 15, 16)],
+        "cpu": [("rect", 6, 6, 18, 18), ("rect", 10, 10, 14, 14),
+                ("line", 9, 3, 9, 6), ("line", 15, 3, 15, 6), ("line", 9, 18, 9, 21),
+                ("line", 15, 18, 15, 21), ("line", 3, 9, 6, 9), ("line", 3, 15, 6, 15),
+                ("line", 18, 9, 21, 9), ("line", 18, 15, 21, 15)],
+        "play": [("poly", [(8, 5), (8, 19), (19, 12)], True)],
+        "refresh": [("arc", 4, 4, 20, 20, 30, 280), ("poly", [(20, 3), (20, 8), (15, 8)], False)],
+        "alert": [("poly", [(12, 4), (21, 20), (3, 20)], True),
+                  ("line", 12, 10, 12, 15), ("dot", 12, 17.5, 1.0)],
+        "check": [("poly", [(4, 12.5), (9.5, 18), (20, 6.5)], False)],
+        "download": [("line", 12, 4, 12, 15), ("poly", [(6, 10), (12, 16), (18, 10)], False),
+                     ("line", 4, 20, 20, 20)],
+        "folder": [("poly", [(3, 7), (9, 7), (11, 4), (14, 4), (21, 4), (21, 19), (3, 19)], True)],
+        "eye": [("arc", 2, 9, 22, 15, 300, 300), ("circle", 12, 12, 3)],
+    }
+
+    def __init__(self, master, name, size=20, color=None, bg=None):
+        super().__init__(master, width=size, height=size, bg=bg or master["bg"],
+                         highlightthickness=0, bd=0)
+        self._color = color or MUTED
+        self._size = size
+        self._name = name
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        s = self._size / 24.0
+        w = max(1.5, 2 * s)
+        c, kw = self._color, dict(width=w, capstyle="round", joinstyle="round")
+        for op in self.PATHS.get(self._name, []):
+            if op[0] == "line":
+                self.create_line(op[1] * s, op[2] * s, op[3] * s, op[4] * s, fill=c, **kw)
+            elif op[0] == "poly":
+                pts = [v * s for p in op[1] for v in p]
+                self.create_line(*pts, fill=c, **kw) if not op[2] else \
+                    self.create_polygon(*pts, outline=c, fill="", **kw)
+            elif op[0] == "rect":
+                self.create_rectangle(op[1] * s, op[2] * s, op[3] * s, op[4] * s,
+                                      outline=c, fill="", **kw)
+            elif op[0] == "circle":
+                r = op[3] * s
+                self.create_oval(op[1] * s - r, op[2] * s - r, op[1] * s + r, op[2] * s + r,
+                                 outline=c, fill="", **kw)
+            elif op[0] == "dot":
+                r = op[3] * s
+                self.create_oval(op[1] * s - r, op[2] * s - r, op[1] * s + r, op[2] * s + r,
+                                 outline=c, fill=c)
+            elif op[0] == "arc":
+                self.create_arc(op[1] * s, op[2] * s, op[3] * s, op[4] * s,
+                                start=op[5], extent=op[6], outline=c, style="arc", **kw)
+
+    def set_color(self, color):
+        self._color = color
+        self._draw()
+
+
+class ScreenPreview(tk.Frame):
+    """Keyboard-screen preview: a dark device bezel holding the exact frame
+    that was pushed to the keyboard (480x360, 4:3). The image always comes
+    from a real render or the real pushed JPEG file — never invented data.
+    Until the first push it shows an honest empty state, not a mock screen."""
+
+    def __init__(self, master, width=440, caption="键盘屏幕预览", **kw):
+        super().__init__(master, bg=BG, **kw)
+        self._w = width
+        self._h = int(width * 3 / 4)
+        self._photo = None
+        bezel = tk.Frame(self, bg="#05070C", padx=10, pady=10,
+                         highlightbackground=BORDER, highlightthickness=1)
+        bezel.pack(fill="x")
+        self._label = tk.Label(bezel, bg="#000000", fg=DIM, font=(FONT, 10),
+                               width=self._w // 10, height=self._h // 22)
+        self._label.pack()
+        self.set_empty("暂无推送内容")
+        cap = tk.Frame(self, bg=BG)
+        cap.pack(fill="x", pady=(8, 0))
+        tk.Label(cap, text=caption, bg=BG, fg=MUTED, font=(FONT, 9)).pack(side="left")
+        self._mode = tk.Label(cap, text="480 × 360 · JPEG", bg=BG, fg=DIM, font=(FONT_EN, 8))
+        self._mode.pack(side="right")
+
+    def set_image(self, pil_img):
+        try:
+            img = pil_img.convert("RGB").resize((self._w, self._h), Image.LANCZOS)
+            self._photo = ImageTk.PhotoImage(img)
+            self._label.config(image=self._photo, text="", width=self._w, height=self._h)
+        except Exception:
+            pass
+
+    def set_empty(self, text="暂无推送内容"):
+        self._photo = None
+        self._label.config(image="", text=text, width=self._w // 10, height=self._h // 22)
+
+    def set_mode(self, text):
+        self._mode.config(text=text)
+
+
 class FakeScreen:
     """A fake Neos75 screen for use without real hardware: records
     pushes and hands the JPEG bytes to the main thread through the
@@ -152,9 +273,9 @@ class FakeScreen:
 
 
 PRESETS = {
-    "dark": dict(bg="#0C0A14", sidebar="#14101F", card="#1A1528", card_hi="#241B38",
-                 fg="#F4F1FA", muted="#A49BB8", dim="#6F6584", accent="#8B5CF6",
-                 border="#2C2340"),
+    "dark": dict(bg="#0D111B", sidebar="#111827", card="#1A2231", card_hi="#222D40",
+                 fg="#F4F6FC", muted="#A0AEC0", dim="#7A8699", accent="#7586FF",
+                 border="#26314A"),
     "red": dict(bg="#0B0A0C", sidebar="#0F0C0E", card="#171114", card_hi="#20171B",
                 fg="#F7F2F3", muted="#A08F94", dim="#6B5C60", accent="#E63C3C",
                 border="#2A1D21"),
@@ -268,7 +389,7 @@ class App:
         apply_palette(self.cfg.get("palette") or "dark")
         # v3 palette: users who never picked a custom accent (still on the old
         # default blue) move to the new violet accent; custom choices are kept.
-        if self.cfg.get("accent") in (None, "#4D6BFE"):
+        if self.cfg.get("accent") in (None, "#4D6BFE", "#8B5CF6"):
             self.cfg["accent"] = ACCENT
         self.accent = self.cfg.get("accent") or ACCENT
         logsetup.info("app start v%s config=%s" % (
@@ -283,6 +404,7 @@ class App:
         self.sim_label = None
         self.sim_status_label = None
         self.sim_photo = None
+        self.previews = {}  # page key -> ScreenPreview, fed by _tick_preview
         self.skin_labels = {}
         self.idle_preview = None
         self._build()
@@ -300,7 +422,7 @@ class App:
     # ------------------------------------------------------------------ shell
     def _build(self):
         root = self.root
-        root.title(f"Neos75 屏幕助手 v{VERSION}")
+        root.title(f"Neos75 屏幕助手 v{VERSION}")  # window title stays searchable
         try:
             import ctypes
             _hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
@@ -309,88 +431,156 @@ class App:
         except Exception:
             pass  # dark title bar is cosmetic; fall back to the system default
         root.configure(bg=BG)
-        root.geometry("1024x780")
+        root.geometry("1200x800")
         root.update_idletasks()
         _sw, _sh = root.winfo_screenwidth(), root.winfo_screenheight()
-        root.geometry(f"1024x780+{max(0, (_sw - 1024) // 2)}+{max(0, (_sh - 780) // 2)}")
-        root.minsize(960, 700)
+        root.geometry(f"1200x800+{max(0, (_sw - 1200) // 2)}+{max(0, (_sh - 800) // 2)}")
+        root.minsize(1024, 640)
         try:
             if os.path.exists(ICON_ICO):
                 root.iconbitmap(ICON_ICO)
         except Exception:
             pass
 
-        self.topbar = tk.Frame(root, bg=SIDEBAR, height=64)
+        self.sidebar = tk.Frame(root, bg=SIDEBAR, width=224)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+        self._build_sidebar()
+
+        tk.Frame(root, bg=BORDER, width=1).pack(side="left", fill="y")
+
+        self.right = tk.Frame(root, bg=BG)
+        self.right.pack(side="left", fill="both", expand=True)
+        right = self.right
+
+        self.topbar = tk.Frame(right, bg=BG, height=64)
         self.topbar.pack(side="top", fill="x")
         self.topbar.pack_propagate(False)
         self._build_topbar()
+        tk.Frame(right, bg=BORDER, height=1).pack(side="top", fill="x")
 
-        tk.Frame(root, bg=BORDER, height=1).pack(side="top", fill="x")
-        self.main = tk.Frame(root, bg=BG)
+        self.statusbar = tk.Frame(right, bg=SIDEBAR, height=30)
+        self.statusbar.pack(side="bottom", fill="x")
+        self.statusbar.pack_propagate(False)
+        self._build_statusbar()
+
+        self.main = tk.Frame(right, bg=BG)
         self.main.pack(side="top", fill="both", expand=True)
+        self.previews = {}
 
         self.val_var = tk.BooleanVar(value=bool(self.cfg.get("valorant", False)))
         self.pages = {
+            "overview": self._page_overview(),
             "lyrics": self._page_lyrics(),
             "game": self._page_game(),
             "mon": self._page_monitor(),
-            "log": self._page_log(),
             "look": self._page_look(),
+            "log": self._page_log(),
             "fw": self._page_fw(),
         }
-        self.show_page("lyrics")
+        self.show_page("overview")
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def _build_topbar(self):
-        # v3 shell: no side rail at all. One top bar holds the brand, the
-        # page tabs in the middle, and device status + Start/Stop on the right.
-        bar = self.topbar
-        left = tk.Frame(bar, bg=SIDEBAR)
-        left.pack(side="left", padx=(22, 0), pady=12)
+    def _build_sidebar(self):
+        side = self.sidebar
+        brand = tk.Frame(side, bg=SIDEBAR)
+        brand.pack(fill="x", padx=20, pady=(20, 6))
         try:
-            img = Image.open(ICON_PNG).resize((32, 32), Image.LANCZOS)
+            img = Image.open(ICON_PNG).resize((36, 36), Image.LANCZOS)
             self.logo_img = ImageTk.PhotoImage(img)
-            tk.Label(left, image=self.logo_img, bg=SIDEBAR).pack(side="left")
+            tk.Label(brand, image=self.logo_img, bg=SIDEBAR).pack(side="left")
         except Exception:
-            tk.Label(left, text="N75", bg=SIDEBAR, fg=FG, font=(FONT, 12, "bold")).pack(side="left")
-        _wm = tk.Frame(left, bg=SIDEBAR)
+            tk.Label(brand, text="N75", bg=SIDEBAR, fg=FG, font=(FONT, 12, "bold")).pack(side="left")
+        _wm = tk.Frame(brand, bg=SIDEBAR)
         _wm.pack(side="left", padx=(10, 0))
-        tk.Label(_wm, text="Neos75", bg=SIDEBAR, fg=FG, font=(FONT, 13, "bold")).pack(anchor="w")
-        tk.Label(_wm, text="屏幕助手 · v" + VERSION, bg=SIDEBAR, fg=DIM, font=(FONT, 8)).pack(anchor="w")
+        tk.Label(_wm, text="Neos75 屏幕助手", bg=SIDEBAR, fg=FG, font=(FONT, 13, "bold")).pack(anchor="w")
+        tk.Label(_wm, text="键盘屏幕控制中心", bg=SIDEBAR, fg=DIM, font=(FONT, 8)).pack(anchor="w")
 
-        tabs = tk.Frame(bar, bg=SIDEBAR)
-        tabs.pack(side="left", padx=(28, 0), pady=14)
         self.nav = {}
-        for key, label in (("lyrics", "歌词"), ("game", "对局"), ("mon", "监控"),
-                            ("look", "外观"), ("log", "日志"), ("fw", "固件")):
-            btn = pill(tabs, label, lambda k=key: self.show_page(k), "ghost", width=6, size=10)
-            btn.pack(side="left", padx=3)
-            btn.bind("<Enter>", lambda e, k=key: self._nav_hover(k, True))
-            btn.bind("<Leave>", lambda e, k=key: self._nav_hover(k, False))
-            self.nav[key] = {"btn": btn}
+        for section, items in (("设备", (("overview", "设备概览", "grid"),
+                                       ("lyrics", "歌词同步", "music"),
+                                       ("game", "对局", "trophy"),
+                                       ("mon", "系统监控", "activity"))),
+                              ("系统", (("look", "外观", "palette"),
+                                       ("log", "日志", "file"),
+                                       ("fw", "固件", "cpu")))):
+            tk.Label(side, text=section, bg=SIDEBAR, fg=DIM, font=(FONT, 8, "bold")).pack(
+                anchor="w", padx=20, pady=(18, 6))
+            for key, label, icon_name in items:
+                row = tk.Frame(side, bg=SIDEBAR, height=40, cursor="hand2")
+                row.pack(fill="x", padx=12, pady=1)
+                row.pack_propagate(False)
+                bar = tk.Frame(row, bg=SIDEBAR, width=3)
+                bar.pack(side="left", fill="y")
+                icon = Icon(row, icon_name, size=18, color=DIM)
+                icon.pack(side="left", padx=(12, 0), pady=10)
+                text = tk.Label(row, text=label, bg=SIDEBAR, fg=MUTED, font=(FONT, 10))
+                text.pack(side="left", padx=(10, 0))
+                for wdg in (row, icon, text):
+                    wdg.bind("<Button-1>", lambda e, k=key: self.show_page(k))
+                    wdg.bind("<Enter>", lambda e, k=key: self._nav_hover(k, True))
+                    wdg.bind("<Leave>", lambda e, k=key: self._nav_hover(k, False))
+                self.nav[key] = {"row": row, "bar": bar, "icon": icon, "text": text}
 
-        right = tk.Frame(bar, bg=SIDEBAR)
-        right.pack(side="right", padx=(18, 0), pady=14)
-        self.sync_dot = tk.Label(right, text="● 未同步", bg=SIDEBAR, fg=MUTED, font=(FONT, 9, "bold"))
-        self.sync_dot.pack(side="left", padx=(0, 12))
-        _dev = tk.Frame(right, bg=CARD, padx=10, pady=6)
-        _dev.pack(side="left")
-        self.dev_dot = tk.Label(_dev, text="●", bg=CARD, fg=DIM, font=("Segoe UI", 9))
+        bottom = tk.Frame(side, bg=SIDEBAR)
+        bottom.pack(side="bottom", fill="x", padx=12, pady=14)
+        dev = tk.Frame(bottom, bg=CARD, padx=12, pady=10)
+        dev.pack(fill="x")
+        _dr = tk.Frame(dev, bg=CARD)
+        _dr.pack(fill="x")
+        self.dev_dot = tk.Label(_dr, text="●", bg=CARD, fg=DIM, font=("Segoe UI", 9))
         self.dev_dot.pack(side="left")
-        self.dev_text = tk.Label(_dev, text="未连接", bg=CARD, fg=DIM, font=(FONT, 9))
+        self.dev_text = tk.Label(_dr, text="未连接", bg=CARD, fg=DIM, font=(FONT, 9))
         self.dev_text.pack(side="left", padx=(6, 0))
-        self.sync_start = pill(right, "开始", self.start, "primary", width=6, size=9, accent=self.accent)
-        self.sync_start.pack(side="left", padx=(12, 0))
-        self.sync_stop = pill(right, "停止", self.stop, "danger", width=6, size=9)
-        self.sync_stop.pack(side="left", padx=6)
-        _exit = pill(right, "退出", self.quit, "ghost", width=5, size=9)
-        _exit.pack(side="left", padx=(2, 0))
+        tk.Label(dev, text="USB 5542:0001 · 有线", bg=CARD, fg=DIM, font=(FONT_EN, 8)).pack(
+            anchor="w", pady=(4, 0))
+        self.aula_warn = tk.Label(dev, text="", bg=CARD, fg=WARN, font=(FONT, 8),
+                                  wraplength=180, justify="left", anchor="w")
+        self.aula_warn.pack(fill="x", pady=(6, 0))
+
+    PAGE_META = {
+        "overview": ("设备概览", "键盘、屏幕与同步服务的状态总览"),
+        "lyrics": ("歌词同步", "把正在播放的歌词推送到键盘屏幕"),
+        "game": ("对局", "无畏契约比分实时上屏"),
+        "mon": ("系统监控", "电脑状态实时上屏"),
+        "look": ("外观", "键盘屏幕的背景、配色与显示样式"),
+        "log": ("日志", "运行日志与诊断信息"),
+        "fw": ("固件", "屏幕版本与全屏补丁"),
+    }
+
+    def _build_topbar(self):
+        bar = self.topbar
+        txt = tk.Frame(bar, bg=BG)
+        txt.pack(side="left", padx=28, pady=10)
+        self.page_title = tk.Label(txt, text="设备概览", bg=BG, fg=FG, font=(FONT, 18, "bold"))
+        self.page_title.pack(anchor="w")
+        self.page_subtitle = tk.Label(txt, text="", bg=BG, fg=DIM, font=(FONT, 9))
+        self.page_subtitle.pack(anchor="w")
+        right = tk.Frame(bar, bg=BG)
+        right.pack(side="right", padx=24, pady=16)
+        self.sync_dot = tk.Label(right, text="● 未同步", bg=BG, fg=MUTED, font=(FONT, 9, "bold"))
+        self.sync_dot.pack(side="left", padx=(0, 12))
+        self.sync_start = pill(right, "开始同步", self.start, "primary", width=8, size=10, accent=self.accent)
+        self.sync_start.pack(side="left")
+        self.sync_stop = pill(right, "停止", self.stop, "danger", width=6, size=10)
+        self.sync_stop.pack(side="left", padx=8)
+
+    def _build_statusbar(self):
+        bar = self.statusbar
+        self.status_label = tk.Label(bar, text="未连接", bg=SIDEBAR, fg=MUTED, font=(FONT, 9), anchor="w")
+        self.status_label.pack(side="left", padx=16)
+        tk.Label(bar, text="v" + VERSION, bg=SIDEBAR, fg=DIM, font=(FONT_EN, 8)).pack(side="right", padx=16)
+        tk.Label(bar, text="480 × 360 · JPEG", bg=SIDEBAR, fg=DIM, font=(FONT_EN, 8)).pack(side="right")
 
     def _nav_hover(self, key, on):
         if self.page == key:
             return
         item = self.nav[key]
-        item["btn"].config(bg=BORDER if on else CARD_HI)
+        bg = CARD_HI if on else SIDEBAR
+        item["row"].configure(bg=bg)
+        item["icon"].config(bg=bg)
+        item["icon"].set_color(FG if on else DIM)
+        item["text"].configure(bg=bg, fg=FG if on else MUTED)
 
     def _check_aula(self):
         try:
@@ -412,25 +602,143 @@ class App:
             self.root.after(120, lambda: self.refresh_log_view(again=False))
         for frame in self.pages.values():
             frame.pack_forget()
-        self.pages[key].pack(fill="both", expand=True, padx=36, pady=(20, 18))
+        _title, _sub = self.PAGE_META.get(key, ("", ""))
+        self.page_title.config(text=_title)
+        self.page_subtitle.config(text=_sub)
+        self.pages[key].pack(fill="both", expand=True, padx=28, pady=(16, 18))
         for k, item in self.nav.items():
             active = k == key
-            item["btn"].config(bg=self.accent if active else CARD_HI,
-                               fg="#FFFFFF" if active else MUTED)
+            bg = CARD_HI if active else SIDEBAR
+            item["row"].configure(bg=bg)
+            item["bar"].configure(bg=self.accent if active else SIDEBAR)
+            item["icon"].config(bg=bg)
+            item["icon"].set_color(self.accent if active else DIM)
+            item["text"].configure(bg=bg, fg=FG if active else MUTED)
         self.page = key
+
+    # -------------------------------------------------------------- overview
+    def _page_overview(self):
+        # Device overview: only facts the app can actually read — connection
+        # state from the engine, the fixed USB identity of the screen the app
+        # looks for, the 480x360 JPEG screen spec, sync service state, and the
+        # screen content the user enabled in settings. Nothing is invented.
+        frame = tk.Frame(self.main, bg=BG)
+        left = tk.Frame(frame, bg=BG)
+        left.pack(side="left", fill="both", expand=True)
+        right = tk.Frame(frame, bg=BG)
+        right.pack(side="left", fill="y", padx=(20, 0))
+
+        dev = Card(left, bg=CARD, radius=16, padx=20, pady=18)
+        dev.pack(fill="x")
+        top = tk.Frame(dev.body, bg=CARD)
+        top.pack(fill="x")
+        self.ov_dot = tk.Label(top, text="●", bg=CARD, fg=DIM, font=(FONT_EN, 20))
+        self.ov_dot.pack(side="left")
+        _t = tk.Frame(top, bg=CARD)
+        _t.pack(side="left", padx=(10, 0))
+        self.ov_state = tk.Label(_t, text="等待键盘", bg=CARD, fg=FG, font=(FONT, 15, "bold"))
+        self.ov_state.pack(anchor="w")
+        self.ov_state_sub = tk.Label(_t, text="用 USB 数据线连接键盘后开始同步", bg=CARD, fg=MUTED, font=(FONT, 9))
+        self.ov_state_sub.pack(anchor="w")
+
+        rows = tk.Frame(dev.body, bg=CARD)
+        rows.pack(fill="x", pady=(14, 0))
+        self.ov_rows = {}
+        for key, label in (("device", "设备"), ("conn", "连接"), ("screen", "屏幕"),
+                           ("sync", "同步服务"), ("modes", "屏幕内容")):
+            r = tk.Frame(rows, bg=CARD)
+            r.pack(fill="x", pady=3)
+            tk.Label(r, text=label, bg=CARD, fg=DIM, font=(FONT, 9), width=10, anchor="w").pack(side="left")
+            v = tk.Label(r, text="—", bg=CARD, fg=FG, font=(FONT, 9), anchor="w")
+            v.pack(side="left", fill="x", expand=True)
+            self.ov_rows[key] = v
+
+        guide = Card(left, bg=CARD, radius=16, padx=20, pady=16)
+        guide.pack(fill="x", pady=(14, 0))
+        tk.Label(guide.body, text="连接指南", bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(anchor="w")
+        self.ov_guide = tk.Label(guide.body, text="", bg=CARD, fg=MUTED, font=(FONT, 9),
+                                 justify="left", anchor="w", wraplength=560)
+        self.ov_guide.pack(fill="x", pady=(8, 0))
+
+        act = Card(right, bg=CARD, radius=16, padx=20, pady=18)
+        act.pack(fill="x")
+        tk.Label(act.body, text="快捷操作", bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(anchor="w")
+        pill(act.body, "开始 / 停止同步", self.toggle, "primary", width=14, size=10,
+             accent=self.accent).pack(anchor="w", pady=(12, 0))
+        pill(act.body, "模拟屏幕", self.toggle_sim, "ghost", width=14, size=10).pack(anchor="w", pady=(8, 0))
+        pill(act.body, "检查屏幕", self.check_fw, "ghost", width=14, size=10).pack(anchor="w", pady=(8, 0))
+        pill(act.body, "外观设置", lambda: self.show_page("look"), "ghost", width=14, size=10).pack(anchor="w", pady=(8, 0))
+        self.root.after(500, self._overview_tick)
+        return frame
+
+    def _overview_tick(self):
+        try:
+            running = bool(self.engine and self.engine.running)
+            if self.sim_enabled:
+                state, color, sub = "模拟屏幕", ACCENT2, "推送会显示在模拟窗口里，不经过真键盘"
+            elif self.engine is not None and getattr(self.engine, "device_ok", False):
+                state, color, sub = "已连接", MINT, "键盘屏幕已就绪，可以开始同步"
+            elif running:
+                state, color, sub = "等待键盘", WARN, "同步服务在运行，等待键盘接入"
+            else:
+                state, color, sub = "等待键盘", WARN, "用 USB 数据线连接键盘后开始同步"
+            self.ov_dot.config(fg=color)
+            self.ov_state.config(text=state)
+            self.ov_state_sub.config(text=sub)
+            self.ov_rows["device"].config(text="Neos75 键盘屏幕")
+            self.ov_rows["conn"].config(
+                text="USB 5542:0001 · 有线连接" if state == "已连接" else "USB 5542:0001 · 未接入")
+            self.ov_rows["screen"].config(
+                text="480 × 360 · JPEG 推送" if state == "已连接" else "未确认 — 连接后在固件页检查")
+            self.ov_rows["sync"].config(text="运行中" if running else "已停止")
+            _scenes = self.cfg.get("scenes", {}) or {}
+            _modes = []
+            if _scenes.get("lyrics", True):
+                _modes.append("歌词")
+            if _scenes.get("info", True):
+                _modes.append("信息屏")
+            if self.cfg.get("valorant"):
+                _modes.append("对局")
+            self.ov_rows["modes"].config(text="、".join(_modes) if _modes else "未启用任何内容")
+            if state == "已连接":
+                guide = "设备已就绪。歌词、对局、监控会按你在各页的设置推送到屏幕上；想换样式去外观页。"
+            elif self.sim_enabled:
+                guide = "模拟屏幕已开启：没有真键盘也能看到推送效果。关掉模拟屏幕后，下次推送会重新找真键盘。"
+            else:
+                guide = ("1. 用 USB 数据线把键盘连到电脑（2.4G 接收器模式下屏幕不可用）。\n"
+                         "2. 点右上角「开始同步」，等状态变成已连接。\n"
+                         "3. 如果一直找不到键盘，点「检查屏幕」看具体原因，或到固件页确认是否刷了全屏补丁。")
+            self.ov_guide.config(text=guide)
+        except Exception:
+            pass
+        self.root.after(2000, self._overview_tick)
 
     # ---------------------------------------------------------------- lyrics
     def _page_lyrics(self):
+        # Lyrics sync control panel — this page controls what the keyboard
+        # screen shows, it is not a music player: no play/pause/next controls.
+        # Left: player + sync controls + current lyric. Right: the live screen
+        # preview, which shows the exact frame last pushed to the keyboard.
         frame = tk.Frame(self.main, bg=BG)
+        left = tk.Frame(frame, bg=BG)
+        left.pack(side="left", fill="both", expand=True)
+        right = tk.Frame(frame, bg=BG)
+        right.pack(side="left", fill="y", padx=(20, 0))
 
-        head = tk.Frame(frame, bg=BG)
-        head.pack(fill="x", pady=(0, 14))
-        self.track_label = tk.Label(head, text="选择播放器，点顶栏「开始」", bg=BG, fg=FG,
-                                    font=(FONT, 14, "bold"), anchor="w")
-        self.track_label.pack(anchor="w", pady=(2, 0))
+        player = Card(left, bg=CARD, radius=16, padx=20, pady=16)
+        player.pack(fill="x")
+        tk.Label(player.body, text="正在播放", bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(anchor="w")
+        _src = "系统媒体会话 (SMTC)" if self.cfg.get("smtc", True) else "桌面歌词 OCR"
+        tk.Label(player.body, text=f"播放器：{_src}", bg=CARD, fg=DIM, font=(FONT, 9)).pack(anchor="w", pady=(6, 0))
+        self.track_label = tk.Label(player.body, text="未检测到正在播放的歌曲", bg=CARD, fg=FG,
+                                    font=(FONT, 14, "bold"), anchor="w", wraplength=460, justify="left")
+        self.track_label.pack(anchor="w", fill="x", pady=(8, 0))
 
-        opts = tk.Frame(head, bg=BG)
-        opts.pack(fill="x", pady=(8, 0))
+        ctrl = Card(left, bg=CARD, radius=16, padx=20, pady=16)
+        ctrl.pack(fill="x", pady=(14, 0))
+        tk.Label(ctrl.body, text="同步控制", bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(anchor="w")
+        opts = tk.Frame(ctrl.body, bg=CARD)
+        opts.pack(fill="x", pady=(10, 0))
         scenes = self.cfg.get("scenes", {}) or {}
         self.lyr_push = tk.BooleanVar(value=bool(scenes.get("lyrics", True)))
         t1 = Toggle(opts, "自动推送", self.lyr_push, accent=self.accent)
@@ -440,38 +748,35 @@ class App:
         t2 = Toggle(opts, "专辑封面当背景", self.lyr_cover, accent=self.accent)
         t2.oncommand(self.save_cfg)
         t2.pack(side="left", padx=10)
+        row = tk.Frame(ctrl.body, bg=CARD)
+        row.pack(fill="x", pady=(12, 0))
+        pill(row, "推送到屏幕", lambda: self.push_module_ui("lyrics"), "primary", width=12,
+             accent=self.accent).pack(side="left")
+        self.sim_btn = pill(row, "模拟屏幕", self.toggle_sim, "ghost", width=10, size=10)
+        self.sim_btn.pack(side="left", padx=(10, 0))
 
-        card = Card(frame, bg=CARD, radius=20, padx=24, pady=20, expand=True)
-        card.pack(fill="both", expand=True)
-        body = card.body
-
-        self.line_label = tk.Label(body, text="♪", bg=CARD, fg=FG, wraplength=640,
-                                   justify="center", font=(FONT, 28, "bold"))
-        self.line_label.pack(fill="both", expand=True)
-        self.hint = tk.Label(body, text="点顶栏「开始」后，歌词会跟着播放自动上屏",
+        lyric = Card(left, bg=CARD, radius=16, padx=20, pady=16, expand=True)
+        lyric.pack(fill="both", expand=True, pady=(14, 0))
+        tk.Label(lyric.body, text="当前歌词", bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(anchor="w")
+        self.line_label = tk.Label(lyric.body, text="♪", bg=CARD, fg=FG, wraplength=440,
+                                   justify="left", font=(FONT, 20, "bold"))
+        self.line_label.pack(fill="x", pady=(10, 0))
+        self.next_label = tk.Label(lyric.body, text="", bg=CARD, fg=MUTED, font=(FONT, 11),
+                                   wraplength=440, justify="left")
+        self.next_label.pack(fill="x", pady=(6, 0))
+        self.hint = tk.Label(lyric.body, text="点右上角「开始同步」后，歌词会跟着播放自动上屏",
                              bg=CARD, fg=DIM, font=(FONT, 9))
-        self.hint.pack(pady=(0, 10))
-        self.next_label = tk.Label(body, text="", bg=CARD, fg=MUTED, font=(FONT, 12),
-                                   wraplength=560, justify="center")
-        self.next_label.pack(pady=(8, 14))
-
-        self.progress = tk.Canvas(body, height=6, bg=CARD, highlightthickness=0)
-        self.progress.pack(fill="x")
+        self.hint.pack(anchor="w", pady=(10, 0))
+        self.progress = tk.Canvas(lyric.body, height=6, bg=CARD, highlightthickness=0)
+        self.progress.pack(fill="x", pady=(12, 0))
         self.progress.bind("<Configure>", lambda e: self._draw_progress(0.0))
 
-        foot = tk.Frame(frame, bg=BG)
-        foot.pack(fill="x", pady=(14, 0))
-        pill(foot, "推送到屏幕", lambda: self.push_module_ui("lyrics"), "primary", width=12,
-             accent=self.accent).pack(side="left")
-        self.sim_btn = pill(foot, "模拟屏幕", self.toggle_sim, "ghost", width=10, size=10)
-        self.sim_btn.pack(side="left", padx=(10, 0))
-        self.thumb = tk.Label(foot, bg=BG)
-        self.thumb.pack(side="right")
-        # Status on its own line so long messages (e.g. "没有找到 Neos75 屏幕…")
-        # are not squeezed off the right edge by the button and thumbnail.
-        self.status_label = tk.Label(frame, text="未连接", bg=BG, fg=MUTED, font=(FONT, 9),
-                                    anchor="w", justify="left", wraplength=640)
-        self.status_label.pack(fill="x", pady=(8, 0))
+        self.previews["lyrics"] = ScreenPreview(right, width=440, caption="键盘屏幕预览")
+        self.previews["lyrics"].pack(fill="x")
+        tk.Label(right, text="预览显示最近一次实际推送到键盘的画面，", bg=BG, fg=DIM,
+                 font=(FONT, 8), wraplength=440, justify="left").pack(anchor="w", pady=(10, 0))
+        tk.Label(right, text="未开始同步前这里是空的，不会用假画面代替。", bg=BG, fg=DIM,
+                 font=(FONT, 8), wraplength=440, justify="left").pack(anchor="w")
         return frame
 
     def _draw_progress(self, frac):
@@ -495,8 +800,8 @@ class App:
             self.skin_labels.clear()
         except Exception:
             pass
-        self.topbar.destroy()
-        self.main.destroy()
+        self.sidebar.destroy()
+        self.right.destroy()
         self._build()
         self.show_page(page)
         self._apply_accent_to_pills()
@@ -654,21 +959,47 @@ class App:
         pill(row, "打开文件夹", self.open_logs, "ghost", width=9, size=9).pack(side="left", padx=8)
         pill(row, "刷新", self.refresh_log_view, "ghost", width=6, size=9).pack(side="left")
 
+        self.log_filter = "all"
+        self.log_chips = {}
+        _frow = tk.Frame(body, bg=CARD)
+        _frow.pack(fill="x", pady=(10, 0))
+        for _label, _key in (("全部", "all"), ("错误", "error"), ("警告", "warn"), ("信息", "info")):
+            _chip = pill(_frow, _label, lambda k=_key: self._set_log_filter(k), "ghost", width=6, size=9)
+            _chip.pack(side="left", padx=(0, 6))
+            self.log_chips[_key] = _chip
+
         self.log_path_label = tk.Label(body, text="", bg=CARD, fg=DIM, font=(FONT, 8), anchor="w")
         self.log_path_label.pack(fill="x", pady=(8, 6))
 
         wrap = tk.Frame(body, bg=CARD_HI)
         wrap.pack(fill="both", expand=True)
-        self.log_text = tk.Text(wrap, bg=CARD_HI, fg=FG, bd=0, font=("Consolas", 8),
+        self.log_text = tk.Text(wrap, bg=CARD_HI, fg=FG, bd=0, font=(FONT_MONO, 8),
                                 insertbackground=FG, wrap="char", height=18, width=80)
         sb = tk.Scrollbar(wrap, command=self.log_text.yview, bg=CARD_HI, bd=0,
                           highlightthickness=0)
         self.log_text.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.log_text.pack(side="left", fill="both", expand=True, padx=6, pady=6)
+        self.log_text.tag_config("err", foreground=DANGER)
+        self.log_text.tag_config("warn", foreground=WARN)
 
         self.root.after(300, self.refresh_log_view)
         return frame
+
+    def _set_log_filter(self, key):
+        self.log_filter = key
+        for k, chip in self.log_chips.items():
+            chip.config(bg=self.accent if k == key else CARD_HI,
+                        fg="#FFFFFF" if k == key else MUTED)
+        self.refresh_log_view(again=False)
+
+    @staticmethod
+    def _log_level(line):
+        if "ERROR" in line or "CRITICAL" in line or "错误" in line or "Traceback" in line:
+            return "error"
+        if "WARNING" in line or "警告" in line:
+            return "warn"
+        return "info"
 
     def refresh_log_view(self, again=True):
         if self.page != "log":
@@ -682,7 +1013,19 @@ class App:
                 with open(path, "r", encoding="utf-8", errors="ignore") as fh:
                     lines = fh.readlines()[-300:]
             self.log_text.delete("1.0", "end")
-            self.log_text.insert("end", "".join(lines))
+            shown = 0
+            for line in lines:
+                level = self._log_level(line)
+                if getattr(self, "log_filter", "all") != "all" and level != self.log_filter:
+                    continue
+                _tag = "err" if level == "error" else ("warn" if level == "warn" else None)
+                if _tag:
+                    self.log_text.insert("end", line, _tag)
+                else:
+                    self.log_text.insert("end", line)
+                shown += 1
+            if shown == 0:
+                self.log_text.insert("end", "（没有符合条件的日志）")
             self.log_text.see("end")
         except Exception as exc:
             self.log_text.delete("1.0", "end")
@@ -724,7 +1067,7 @@ class App:
             box = tk.Frame(grid, bg=CARD_HI, padx=14, pady=9)
             box.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
             tk.Label(box, text=name, bg=CARD_HI, fg=MUTED, font=(FONT, 9), anchor="w").pack(fill="x")
-            val = tk.Label(box, text="—", bg=CARD_HI, fg=FG, font=(FONT, 15, "bold"), anchor="w")
+            val = tk.Label(box, text="—", bg=CARD_HI, fg=FG, font=(FONT_EN, 15, "bold"), anchor="w")
             val.pack(fill="x")
             sub = tk.Label(box, text="", bg=CARD_HI, fg=DIM, font=(FONT, 8), anchor="w")
             sub.pack(fill="x")
@@ -732,12 +1075,9 @@ class App:
             self.mon_subs[key] = sub
             grid.grid_columnconfigure(col, weight=1, uniform="mon")
 
-        prev_box = tk.Frame(body, bg=CARD)
-        prev_box.pack(fill="both", expand=True, pady=(12, 0))
-        tk.Label(prev_box, text="键盘屏幕预览", bg=CARD, fg=MUTED,
-                 font=(FONT, 8)).pack(anchor="w")
-        self.mon_prev = tk.Label(prev_box, bg=CARD, text="采集中…", fg=DIM, font=(FONT, 9))
-        self.mon_prev.pack(anchor="w", pady=(4, 0))
+        self.previews["mon"] = ScreenPreview(body, width=360, caption="键盘屏幕预览")
+        self.previews["mon"].pack(fill="x", pady=(12, 0))
+        self.previews["mon"].set_empty("采集中…")
 
         tk.Label(frame, text="外观页勾选「信息屏」后，这套数据会轮流显示在键盘屏上",
                  bg=BG, fg=DIM, font=(FONT, 8)).pack(anchor="w")
@@ -780,9 +1120,9 @@ class App:
                 self.mon_subs["up"].config(text="已开机")
             tmp = lyrics_screen.WORK / "mon_preview.jpg"
             scenes.render_info(self.cfg, tmp)
-            img = Image.open(tmp).resize((252, 189), Image.LANCZOS)
-            self.mon_img = ImageTk.PhotoImage(img)
-            self.mon_prev.config(image=self.mon_img, text="")
+            img = Image.open(tmp)
+            self.previews["mon"].set_image(img)
+            self.previews["mon"].set_mode("实时监控画面")
         except Exception as exc:
             lyrics_screen.dbg(f"monitor tick failed: {exc}")
         self.root.after(1200, self._monitor_tick)
@@ -819,10 +1159,10 @@ class App:
         pill(row, "重新读取", self.refresh_game, "ghost", width=8, size=9).pack(side="left", padx=8)
         self._bg_row(left, "val", "比分卡背景")
 
-        tk.Label(left, text="键盘屏幕预览", bg=CARD, fg=MUTED, font=(FONT, 8), anchor="w").pack(
-            fill="x", pady=(14, 0))
-        self.game_prev = tk.Label(left, bg=CARD, text="", fg=DIM, font=(FONT, 9), anchor="w")
-        self.game_prev.pack(anchor="w")
+        self.previews["game"] = ScreenPreview(left, width=380, caption="键盘屏幕预览")
+        self.previews["game"].pack(fill="x", pady=(14, 0))
+        tk.Label(left, text="预览由对局识别的真实比分渲染，与推送到屏幕的内容一致。",
+                 bg=CARD, fg=DIM, font=(FONT, 8), wraplength=380, justify="left").pack(fill="x", pady=(8, 0))
 
         self.root.after(200, lambda: self._update_game(False, None))
         self.root.after(400, self.refresh_game)
@@ -867,21 +1207,22 @@ class App:
             self.game_state.config(text=f"对局中   {data['ally']} : {data['enemy']}   "
                                         f"{data.get('timer') or '--:--'}", fg=MINT)
         else:
-            self.game_state.config(text="游戏在运行，但当前画面没有比分（大厅/选人/结算）", fg="#FFB86B")
+            self.game_state.config(text="游戏在运行，但当前画面没有比分（大厅/选人/结算）", fg=WARN)
         try:
             import valorant as V
             sample = data or {"ally": 0, "enemy": 0, "timer": "--:--"}
             tmp = lyrics_screen.WORK / "game_preview.jpg"
             V.render(self.cfg, sample, tmp)
-            img = Image.open(tmp).resize((288, 216), Image.LANCZOS)
-            self.game_prev_img = ImageTk.PhotoImage(img)
-            self.game_prev.config(image=self.game_prev_img, text="")
+            img = Image.open(tmp)
+            self.previews["game"].set_image(img)
+            self.previews["game"].set_mode(
+                f"对局 {sample['ally']}:{sample['enemy']}" if (running and data) else "本地渲染预览")
         except Exception:
             pass
 
     def push_module_ui(self, key):
         if not self.engine or not self.engine.running:
-            messagebox.showinfo("推送到屏幕", "先点侧栏的「开始」启动同步，再推送。")
+            messagebox.showinfo("推送到屏幕", "先点右上角「开始同步」，再推送。")
             return
         ok, msg = self.engine.push_module(key)
         if ok:
@@ -891,7 +1232,7 @@ class App:
 
     def push_game(self):
         if not self.engine or not self.engine.running:
-            messagebox.showinfo("推送", "先点「开始 / 停止」开始同步。")
+            messagebox.showinfo("推送", "先点右上角「开始同步」。")
             return
         try:
             import valorant as V
@@ -912,6 +1253,11 @@ class App:
         frame = tk.Frame(self.main, bg=BG)
         tk.Label(frame, text="改的是键盘屏幕上的画面，不是这个窗口", bg=BG, fg=DIM,
                  font=(FONT, 9)).pack(anchor="w", pady=(2, 14))
+
+        self.previews["look"] = ScreenPreview(frame, width=440, caption="当前屏幕样式预览")
+        self.previews["look"].pack(anchor="w", pady=(0, 12))
+        tk.Label(frame, text="显示最近一次推送的真实画面；改完背景或配色后点「推送到键盘」可刷新。",
+                 bg=BG, fg=DIM, font=(FONT, 8)).pack(anchor="w", pady=(0, 12))
 
         theme_card = Card(frame, bg=CARD, radius=16, padx=18, pady=14)
         theme_card.pack(fill="x", pady=(0, 12))
@@ -1005,7 +1351,7 @@ class App:
         palette_row.pack(fill="x", pady=(10, 0))
         tk.Label(palette_row, text="整体配色", bg=CARD, fg=FG,
                  font=(FONT, 9, "bold")).pack(side="left")
-        for key, label, color in (("dark", "默认", "#4D6BFE"), ("red", "经典红", "#E63C3C"),
+        for key, label, color in (("dark", "默认", "#7586FF"), ("red", "经典红", "#E63C3C"),
                                   ("black", "酷炫黑", "#1A1A1F"), ("light", "浅色", "#FFFFFF")):
             chip = RoundButton(palette_row, label, lambda k=key: self.set_palette(k),
                                bg=color, fg=("#1D1F26" if key == "light" else "#FFFFFF"),
@@ -1068,7 +1414,7 @@ class App:
 
     def push_now(self):
         if not self.engine or not self.engine.running:
-            messagebox.showinfo("推送到键盘", "先点「歌词」页的开始同步，再试。")
+            messagebox.showinfo("推送到键盘", "先点右上角「开始同步」，再试。")
             return
         try:
             ok, msg = self.engine.force_refresh()
@@ -1252,7 +1598,10 @@ class App:
                                 "我来校准区域。")
 
     def apply_city(self):
-        city = (self.city_entry.get() or "").strip() or "上海"
+        entry = getattr(self, "city_entry", None)
+        if entry is None:
+            return  # no city field on any page in this build
+        city = (entry.get() or "").strip() or "上海"
         self.cfg["city"] = city
         lyrics_screen.save_config(self.cfg)
         if self.engine:
@@ -1316,6 +1665,14 @@ class App:
         pill(row, "下载刷机工具", self.open_tool, "primary", width=12, size=9,
              accent=self.accent).pack(side="left", padx=8)
 
+        warn_card = Card(frame, bg=CARD, radius=16, padx=20, pady=14)
+        warn_card.pack(fill="x", pady=(12, 0))
+        tk.Label(warn_card.body, text="刷机有风险", bg=CARD, fg=WARN, font=(FONT, 10, "bold"),
+                 anchor="w").pack(fill="x")
+        tk.Label(warn_card.body, text=("刷写固件可能导致键盘无法启动。请先按下方须知备份完整固件，"
+            "确认固件版本匹配后再操作；刷机工具来自第三方，与本软件无关。"),
+            bg=CARD, fg=MUTED, justify="left", anchor="w", font=(FONT, 9), wraplength=620).pack(fill="x", pady=(6, 0))
+
         tips = Card(frame, bg=CARD, radius=16, padx=20, pady=16)
         tips.pack(fill="both", expand=True, pady=(12, 0))
         tk.Label(tips.body, text="刷机须知", bg=CARD, fg=FG, font=(FONT, 10, "bold"),
@@ -1335,7 +1692,7 @@ class App:
                 self.fw_status.config(text=f"已连接，{st['width']}×{st['height']}，全屏补丁已生效", fg=MINT)
             else:
                 self.fw_status.config(
-                    text=f"已连接，{st['width']}×{st['height']}，还没有刷全屏补丁", fg="#FFB86B")
+                    text=f"已连接，{st['width']}×{st['height']}，还没有刷全屏补丁", fg=WARN)
         except Exception as exc:
             msg = f"没有找到键盘屏幕：{exc}"
             try:
@@ -1344,7 +1701,7 @@ class App:
                     msg = "检测到 2.4G 接收器：屏幕画面只在 USB 有线模式下可用，请插上数据线。"
             except Exception:
                 pass
-            self.fw_status.config(text=msg, fg="#FFB86B")
+            self.fw_status.config(text=msg, fg=WARN)
 
     def open_logs(self):
         import logsetup
@@ -1500,15 +1857,26 @@ class App:
                 self.sim_status_label.config(text=f"模拟屏幕 · 第 {pushes} 次推送 · {len(jpeg)} 字节")
         except Exception:
             pass
+        prev = self.previews.get(self.page)
+        if prev is not None:
+            try:
+                with Image.open(io.BytesIO(jpeg)) as img:
+                    prev.set_image(img)
+                prev.set_mode(f"模拟推送 · 第 {pushes} 次")
+            except Exception:
+                pass
 
     def _tick_preview(self):
+        # The preview shows the exact JPEG the engine last wrote to frame.jpg —
+        # the same bytes _push() sends to the keyboard — for the current page.
+        # Until the first push the preview stays in its empty state.
         try:
-            if self.page == "lyrics" and self.engine and self.engine.running:
-                p = lyrics_screen.FRAME
-                if p.exists():
-                    img = Image.open(p).resize((176, 132), Image.LANCZOS)
-                    self.thumb_img = ImageTk.PhotoImage(img)
-                    self.thumb.config(image=self.thumb_img)
+            prev = self.previews.get(self.page)
+            p = lyrics_screen.FRAME
+            if prev is not None and p.exists():
+                with Image.open(p) as img:
+                    prev.set_image(img)
+                prev.set_mode("实时推送画面")
         except Exception:
             pass
         self.root.after(1200, self._tick_preview)
@@ -1524,7 +1892,7 @@ class App:
                     if "已连接" in payload:
                         self._set_device("模拟屏幕" if self.sim_enabled else "已连接", MINT)
                     elif "等待" in payload or "没有找到" in payload or "未找到" in payload:
-                        self._set_device("等待键盘", "#FBBF24")
+                        self._set_device("等待键盘", WARN)
                 elif kind == "line":
                     track, artist, current, nxt = payload
                     self.track_label.config(text=f"{track}  ·  {artist}" if artist else track)

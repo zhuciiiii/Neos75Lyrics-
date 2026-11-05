@@ -223,14 +223,14 @@ class ScreenPreview(tk.Frame):
 
     def __init__(self, master, width=440, caption="键盘屏幕预览", **kw):
         super().__init__(master, bg=BG, **kw)
-        self._w = width
-        self._h = int(width * 3 / 4)
+        self._pw = width
+        self._ph = int(width * 3 / 4)
         self._photo = None
         bezel = tk.Frame(self, bg="#05070C", padx=10, pady=10,
                          highlightbackground=BORDER, highlightthickness=1)
         bezel.pack(fill="x")
         self._label = tk.Label(bezel, bg="#000000", fg=DIM, font=(FONT, 10),
-                               width=self._w // 10, height=self._h // 22)
+                               width=self._pw // 10, height=self._ph // 22)
         self._label.pack()
         self.set_empty("暂无推送内容")
         cap = tk.Frame(self, bg=BG)
@@ -241,15 +241,15 @@ class ScreenPreview(tk.Frame):
 
     def set_image(self, pil_img):
         try:
-            img = pil_img.convert("RGB").resize((self._w, self._h), Image.LANCZOS)
+            img = pil_img.convert("RGB").resize((self._pw, self._ph), Image.LANCZOS)
             self._photo = ImageTk.PhotoImage(img)
-            self._label.config(image=self._photo, text="", width=self._w, height=self._h)
+            self._label.config(image=self._photo, text="", width=self._pw, height=self._ph)
         except Exception:
             pass
 
     def set_empty(self, text="暂无推送内容"):
         self._photo = None
-        self._label.config(image="", text=text, width=self._w // 10, height=self._h // 22)
+        self._label.config(image="", text=text, width=self._pw // 10, height=self._ph // 22)
 
     def set_mode(self, text):
         self._mode.config(text=text)

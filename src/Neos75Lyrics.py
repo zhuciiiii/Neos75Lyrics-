@@ -19,10 +19,10 @@ import lyrics_screen
 from ui_crop import CropDialog, preview_thumb
 
 # ------------------------------------------------------------------ palette
-BG = "#0A0C10"
-SIDEBAR = "#0D1016"
-CARD = "#12161F"
-CARD_HI = "#171C27"
+BG = "#08090D"
+SIDEBAR = "#0B0D12"
+CARD = "#131722"
+CARD_HI = "#1A1F2E"
 FG = "#F2F4F8"
 MUTED = "#8A93A6"
 DIM = "#6E778A"
@@ -30,7 +30,7 @@ ACCENT = "#4D6BFE"
 ACCENT_DARK = "#3A55D9"
 MINT = "#00D6A4"
 DANGER = "#FF5C5C"
-BORDER = "#1B2130"
+BORDER = "#1E2433"
 
 FONT = "Microsoft YaHei UI"
 
@@ -152,9 +152,9 @@ class FakeScreen:
 
 
 PRESETS = {
-    "dark": dict(bg="#0A0C10", sidebar="#0D1016", card="#12161F", card_hi="#171C27",
+    "dark": dict(bg="#08090D", sidebar="#0B0D12", card="#131722", card_hi="#1A1F2E",
                  fg="#F2F4F8", muted="#8A93A6", dim="#6E778A", accent="#4D6BFE",
-                 border="#1B2130"),
+                 border="#1E2433"),
     "red": dict(bg="#0B0A0C", sidebar="#0F0C0E", card="#171114", card_hi="#20171B",
                 fg="#F7F2F3", muted="#A08F94", dim="#6B5C60", accent="#E63C3C",
                 border="#2A1D21"),
@@ -305,24 +305,25 @@ class App:
         except Exception:
             pass  # dark title bar is cosmetic; fall back to the system default
         root.configure(bg=BG)
-        root.geometry("920x800")
+        root.geometry("1024x780")
         root.update_idletasks()
         _sw, _sh = root.winfo_screenwidth(), root.winfo_screenheight()
-        root.geometry(f"920x800+{max(0, (_sw - 920) // 2)}+{max(0, (_sh - 800) // 2)}")
-        root.minsize(860, 740)
+        root.geometry(f"1024x780+{max(0, (_sw - 1024) // 2)}+{max(0, (_sh - 780) // 2)}")
+        root.minsize(960, 700)
         try:
             if os.path.exists(ICON_ICO):
                 root.iconbitmap(ICON_ICO)
         except Exception:
             pass
 
-        self.sidebar = tk.Frame(root, bg=SIDEBAR, width=212)
+        self.sidebar = tk.Frame(root, bg=SIDEBAR, width=88)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
         self._build_sidebar()
 
         tk.Frame(root, bg=BORDER, width=1).pack(side="left", fill="y")
         self.main = tk.Frame(root, bg=BG)
+        self._build_header()
         self.main.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
         self.val_var = tk.BooleanVar(value=bool(self.cfg.get("valorant", False)))
@@ -338,46 +339,35 @@ class App:
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def _build_sidebar(self):
+        # v2 shell: a narrow icon rail instead of the old 212px text sidebar.
+        # Start/Stop and device status now live in the top header.
         side = self.sidebar
         head = tk.Frame(side, bg=SIDEBAR)
-        head.pack(fill="x", padx=18, pady=(22, 26))
+        head.pack(fill="x", pady=(20, 8))
         try:
-            img = Image.open(ICON_PNG).resize((34, 34), Image.LANCZOS)
+            img = Image.open(ICON_PNG).resize((36, 36), Image.LANCZOS)
             self.logo_img = ImageTk.PhotoImage(img)
-            tk.Label(head, image=self.logo_img, bg=SIDEBAR).pack(side="left")
+            tk.Label(head, image=self.logo_img, bg=SIDEBAR).pack()
         except Exception:
-            pass
-        txt = tk.Frame(head, bg=SIDEBAR)
-        txt.pack(side="left", padx=(10, 0))
-        tk.Label(txt, text="Neos75", bg=SIDEBAR, fg=FG, font=(FONT, 13, "bold")).pack(anchor="w")
-        tk.Label(txt, text="屏幕助手", bg=SIDEBAR, fg=DIM, font=(FONT, 8)).pack(anchor="w")
-
-        syncbox = tk.Frame(side, bg=CARD, padx=10, pady=8)
-        syncbox.pack(fill="x", padx=10, pady=(0, 10))
-        self.sync_dot = tk.Label(syncbox, text="● 未同步", bg=CARD, fg=MUTED,
-                                 font=(FONT, 9, "bold"), anchor="w")
-        self.sync_dot.pack(fill="x")
-        srow = tk.Frame(syncbox, bg=CARD)
-        srow.pack(fill="x", pady=(6, 0))
-        self.sync_start = pill(srow, "开始", self.start, "primary", width=6, size=9, accent=self.accent)
-        self.sync_start.pack(side="left")
-        self.sync_stop = pill(srow, "停止", self.stop, "danger", width=6, size=9)
-        self.sync_stop.pack(side="left", padx=6)
+            tk.Label(head, text="N75", bg=SIDEBAR, fg=FG, font=(FONT, 12, "bold")).pack()
+        tk.Label(side, text="Neos75", bg=SIDEBAR, fg=FG, font=(FONT, 9, "bold")).pack()
+        tk.Label(side, text="v" + VERSION, bg=SIDEBAR, fg=DIM, font=(FONT, 8)).pack(pady=(0, 18))
 
         self.nav = {}
         for key, label, glyph in (("lyrics", "歌词", "♪"), ("game", "对局", "⚔"),
                                   ("mon", "监控", "▤"), ("look", "外观", "◐"),
                                   ("log", "日志", "✎"), ("fw", "固件", "⚙")):
-            row = tk.Frame(side, bg=SIDEBAR, height=44, cursor="hand2")
-            row.pack(fill="x", padx=10, pady=2)
+            row = tk.Frame(side, bg=SIDEBAR, height=64, cursor="hand2")
+            row.pack(fill="x", pady=2)
+            row.pack_propagate(False)
             bar = tk.Frame(row, bg=SIDEBAR, width=3)
             bar.pack(side="left", fill="y")
             inner = tk.Frame(row, bg=SIDEBAR)
-            inner.pack(side="left", fill="both", expand=True, padx=(12, 0))
-            icon = tk.Label(inner, text=glyph, bg=SIDEBAR, fg=DIM, font=(FONT, 12))
-            icon.pack(side="left")
-            text = tk.Label(inner, text=label, bg=SIDEBAR, fg=MUTED, font=(FONT, 10))
-            text.pack(side="left", padx=(10, 0))
+            inner.pack(side="left", fill="both", expand=True)
+            icon = tk.Label(inner, text=glyph, bg=SIDEBAR, fg=DIM, font=(FONT, 16))
+            icon.pack(pady=(10, 0))
+            text = tk.Label(inner, text=label, bg=SIDEBAR, fg=MUTED, font=(FONT, 9))
+            text.pack()
             for wdg in (row, inner, icon, text):
                 wdg.bind("<Button-1>", lambda e, k=key: self.show_page(k))
                 wdg.bind("<Enter>", lambda e, k=key: self._nav_hover(k, True))
@@ -385,18 +375,50 @@ class App:
             self.nav[key] = {"row": row, "bar": bar, "icon": icon, "text": text}
 
         bottom = tk.Frame(side, bg=SIDEBAR)
-        bottom.pack(side="bottom", fill="x", padx=18, pady=18)
-        self.dev_dot = tk.Label(bottom, text="●", bg=SIDEBAR, fg=DIM, font=("Segoe UI", 9))
+        bottom.pack(side="bottom", fill="x", pady=16)
+        _exit_icon = tk.Label(bottom, text="⏻", bg=SIDEBAR, fg=DIM, font=(FONT, 14), cursor="hand2")
+        _exit_icon.pack()
+        _exit_text = tk.Label(bottom, text="退出", bg=SIDEBAR, fg=DIM, font=(FONT, 9), cursor="hand2")
+        _exit_text.pack()
+        for _w in (_exit_icon, _exit_text):
+            _w.bind("<Button-1>", lambda e: self.quit())
+            _w.bind("<Enter>", lambda e: (_exit_icon.configure(fg=DANGER), _exit_text.configure(fg=DANGER)))
+            _w.bind("<Leave>", lambda e: (_exit_icon.configure(fg=DIM), _exit_text.configure(fg=DIM)))
+
+    PAGE_META = {
+        "lyrics": ("正在播放", "歌词实时上屏"),
+        "game": ("无畏契约", "对局比分实时上屏"),
+        "mon": ("电脑监控", "CPU / 内存 / 显卡 / 硬盘 / 网络"),
+        "look": ("外观", "改的是键盘屏幕上的画面"),
+        "log": ("日志", "出问题时把日志发我，能直接定位"),
+        "fw": ("屏幕固件", "歌词 / 对局 / 监控都推到这块屏幕上"),
+    }
+
+    def _build_header(self):
+        # Top header: page title on the left, device status + Start/Stop on the right.
+        head = tk.Frame(self.main, bg=BG)
+        head.pack(fill="x", padx=28, pady=(20, 0))
+        txt = tk.Frame(head, bg=BG)
+        txt.pack(side="left")
+        self.page_title = tk.Label(txt, text="正在播放", bg=BG, fg=FG, font=(FONT, 16, "bold"))
+        self.page_title.pack(anchor="w")
+        self.page_subtitle = tk.Label(txt, text="歌词实时上屏", bg=BG, fg=DIM, font=(FONT, 9))
+        self.page_subtitle.pack(anchor="w")
+        right = tk.Frame(head, bg=BG)
+        right.pack(side="right")
+        self.sync_dot = tk.Label(right, text="● 未同步", bg=BG, fg=MUTED, font=(FONT, 9, "bold"))
+        self.sync_dot.pack(side="left", padx=(0, 12))
+        _dev = tk.Frame(right, bg=CARD, padx=10, pady=6)
+        _dev.pack(side="left")
+        self.dev_dot = tk.Label(_dev, text="●", bg=CARD, fg=DIM, font=("Segoe UI", 9))
         self.dev_dot.pack(side="left")
-        self.dev_text = tk.Label(bottom, text="未连接", bg=SIDEBAR, fg=DIM, font=(FONT, 8),
-                                 wraplength=150, justify="left")
+        self.dev_text = tk.Label(_dev, text="未连接", bg=CARD, fg=DIM, font=(FONT, 9))
         self.dev_text.pack(side="left", padx=(6, 0))
-        tk.Label(bottom, text="退出", bg=SIDEBAR, fg=DIM, font=(FONT, 8), cursor="hand2").pack(
-            side="right")
-        bottom.winfo_children()[-1].bind("<Button-1>", lambda e: self.quit())
-        _exit = bottom.winfo_children()[-1]
-        _exit.bind("<Enter>", lambda e: _exit.configure(fg=DANGER))
-        _exit.bind("<Leave>", lambda e: _exit.configure(fg=DIM))
+        self.sync_start = pill(right, "开始", self.start, "primary", width=6, size=9, accent=self.accent)
+        self.sync_start.pack(side="left", padx=(12, 0))
+        self.sync_stop = pill(right, "停止", self.stop, "danger", width=6, size=9)
+        self.sync_stop.pack(side="left", padx=6)
+        tk.Frame(self.main, bg=BORDER, height=1).pack(fill="x", padx=28, pady=(14, 0))
 
     def _nav_hover(self, key, on):
         if self.page == key:
@@ -429,7 +451,10 @@ class App:
             self.root.after(120, lambda: self.refresh_log_view(again=False))
         for frame in self.pages.values():
             frame.pack_forget()
-        self.pages[key].pack(fill="both", expand=True, padx=26, pady=(22, 18))
+        _title, _sub = self.PAGE_META.get(key, ("", ""))
+        self.page_title.config(text=_title)
+        self.page_subtitle.config(text=_sub)
+        self.pages[key].pack(fill="both", expand=True, padx=28, pady=(16, 18))
         for k, item in self.nav.items():
             active = k == key
             bg = CARD_HI if active else SIDEBAR
@@ -448,7 +473,6 @@ class App:
 
         head = tk.Frame(frame, bg=BG)
         head.pack(fill="x", pady=(0, 14))
-        tk.Label(head, text="正在播放", bg=BG, fg=DIM, font=(FONT, 9)).pack(anchor="w")
         self.track_label = tk.Label(head, text="选择播放器，点侧栏「开始」", bg=BG, fg=FG,
                                     font=(FONT, 12, "bold"), anchor="w")
         self.track_label.pack(anchor="w", pady=(2, 0))
@@ -664,7 +688,6 @@ class App:
         frame = tk.Frame(self.main, bg=BG)
         head = tk.Frame(frame, bg=BG)
         head.pack(fill="x")
-        tk.Label(head, text="日志", bg=BG, fg=FG, font=(FONT, 15, "bold")).pack(side="left")
         tk.Label(head, text="出问题时把日志发我，能直接定位", bg=BG, fg=DIM,
                  font=(FONT, 9)).pack(side="left", padx=10)
 
@@ -720,7 +743,6 @@ class App:
         frame = tk.Frame(self.main, bg=BG)
         head = tk.Frame(frame, bg=BG)
         head.pack(fill="x")
-        tk.Label(head, text="电脑监控", bg=BG, fg=FG, font=(FONT, 15, "bold")).pack(side="left")
         tk.Label(head, text="CPU / 内存 / 显卡 / 硬盘 / 网络", bg=BG, fg=DIM,
                  font=(FONT, 9)).pack(side="left", padx=10)
 
@@ -818,7 +840,6 @@ class App:
         frame = tk.Frame(self.main, bg=BG)
         head = tk.Frame(frame, bg=BG)
         head.pack(fill="x")
-        tk.Label(head, text="无畏契约", bg=BG, fg=FG, font=(FONT, 15, "bold")).pack(side="left")
         tk.Label(head, text="对局比分实时上屏", bg=BG, fg=DIM,
                  font=(FONT, 9)).pack(side="left", padx=10)
         tv = Toggle(head, "自动推送", self.val_var, accent=self.accent)
@@ -937,7 +958,6 @@ class App:
     # ------------------------------------------------------------------ look
     def _page_look(self):
         frame = tk.Frame(self.main, bg=BG)
-        tk.Label(frame, text="外观", bg=BG, fg=FG, font=(FONT, 15, "bold")).pack(anchor="w")
         tk.Label(frame, text="改的是键盘屏幕上的画面，不是这个窗口", bg=BG, fg=DIM,
                  font=(FONT, 9)).pack(anchor="w", pady=(2, 14))
 
@@ -1328,7 +1348,6 @@ class App:
         frame = tk.Frame(self.main, bg=BG)
         head = tk.Frame(frame, bg=BG)
         head.pack(fill="x")
-        tk.Label(head, text="屏幕固件", bg=BG, fg=FG, font=(FONT, 15, "bold")).pack(side="left")
         tk.Label(head, text=f"当前版本 v{VERSION}", bg=BG, fg=self.accent,
                  font=(FONT, 10, "bold")).pack(side="left", padx=12)
         tk.Label(frame, text="歌词 / 对局 / 监控 都推到这块 480×360 的屏幕上", bg=BG, fg=DIM,

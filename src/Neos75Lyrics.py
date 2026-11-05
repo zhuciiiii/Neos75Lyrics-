@@ -181,28 +181,34 @@ class Icon(tk.Canvas):
         self.delete("all")
         s = self._size / 24.0
         w = max(1.5, 2 * s)
-        c, kw = self._color, dict(width=w, capstyle="round", joinstyle="round")
+        # Tk canvas only accepts -capstyle/-joinstyle on lines; rectangles,
+        # ovals and arcs reject them (that crashed startup), so each item type
+        # gets only the options it supports.
+        c = self._color
+        line_kw = dict(width=w, capstyle="round", joinstyle="round")
+        poly_kw = dict(width=w, joinstyle="round")
+        shape_kw = dict(width=w)
         for op in self.PATHS.get(self._name, []):
             if op[0] == "line":
-                self.create_line(op[1] * s, op[2] * s, op[3] * s, op[4] * s, fill=c, **kw)
+                self.create_line(op[1] * s, op[2] * s, op[3] * s, op[4] * s, fill=c, **line_kw)
             elif op[0] == "poly":
                 pts = [v * s for p in op[1] for v in p]
-                self.create_line(*pts, fill=c, **kw) if not op[2] else \
-                    self.create_polygon(*pts, outline=c, fill="", **kw)
+                self.create_line(*pts, fill=c, **line_kw) if not op[2] else \
+                    self.create_polygon(*pts, outline=c, fill="", **poly_kw)
             elif op[0] == "rect":
                 self.create_rectangle(op[1] * s, op[2] * s, op[3] * s, op[4] * s,
-                                      outline=c, fill="", **kw)
+                                      outline=c, fill="", **shape_kw)
             elif op[0] == "circle":
                 r = op[3] * s
                 self.create_oval(op[1] * s - r, op[2] * s - r, op[1] * s + r, op[2] * s + r,
-                                 outline=c, fill="", **kw)
+                                 outline=c, fill="", **shape_kw)
             elif op[0] == "dot":
                 r = op[3] * s
                 self.create_oval(op[1] * s - r, op[2] * s - r, op[1] * s + r, op[2] * s + r,
                                  outline=c, fill=c)
             elif op[0] == "arc":
                 self.create_arc(op[1] * s, op[2] * s, op[3] * s, op[4] * s,
-                                start=op[5], extent=op[6], outline=c, style="arc", **kw)
+                                start=op[5], extent=op[6], outline=c, style="arc", **shape_kw)
 
     def set_color(self, color):
         self._color = color

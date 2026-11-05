@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Neos75 歌词屏 v3 — 歌词实时上屏 + 屏幕固件助手。"""
+import io
 import os
 import queue
 import subprocess
@@ -127,6 +128,29 @@ class Card(tk.Frame):
             self.canvas.configure(height=need)
 
 
+class FakeScreen:
+    """A fake Neos75 screen for use without real hardware: records
+    pushes and hands the JPEG bytes to the main thread through the
+    app event queue, instead of talking to HID. Engine.check_device()
+    accepts it because status() reports 480x360."""
+
+    def __init__(self, events):
+        self.events = events
+        self.pushes = 0
+
+    def status(self):
+        return {"width": 480, "height": 360, "support_jpg": True, "space": 0}
+
+    def push(self, jpeg, timeout=1.5):
+        assert jpeg[:2] == b"\xff\xd8", "pushed data is not a JPEG"
+        self.pushes += 1
+        self.events.put(("simframe", (self.pushes, bytes(jpeg))))
+        return {"ms": 0, "reports": 1, "bytes": len(jpeg)}
+
+    def close(self):
+        pass
+
+
 PRESETS = {
     "dark": dict(bg="#0A0C10", sidebar="#0D1016", card="#12161F", card_hi="#171C27",
                  fg="#F2F4F8", muted="#8A93A6", dim="#6E778A", accent="#4D6BFE",
@@ -250,9 +274,16 @@ class App:
         self.tray = None
         self.page = "lyrics"
         self.preview_img = None
+        self.sim_enabled = bool(self.cfg.get("sim_screen", False))
+        self.sim_window = None
+        self.sim_label = None
+        self.sim_status_label = None
+        self.sim_photo = None
         self.skin_labels = {}
         self.idle_preview = None
         self._build()
+        if self.sim_enabled:
+            self._open_sim_window()
         self._refresh_thumbs()
         self.root.after(1500, self._check_aula)
         try:
@@ -266,6 +297,13 @@ class App:
     def _build(self):
         root = self.root
         root.title(f"Neos75 屏幕助手 v{VERSION}")
+        try:
+            import ctypes
+            _hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                _hwnd, 20, ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int))
+        except Exception:
+            pass  # dark title bar is cosmetic; fall back to the system default
         root.configure(bg=BG)
         root.geometry("920x800")
         root.update_idletasks()
@@ -449,11 +487,15 @@ class App:
         foot.pack(fill="x", pady=(14, 0))
         pill(foot, "推送到屏幕", lambda: self.push_module_ui("lyrics"), "primary", width=12,
              accent=self.accent).pack(side="left")
-        self.status_label = tk.Label(foot, text="未连接", bg=BG, fg=MUTED, font=(FONT, 9))
-        self.status_label.pack(side="left", padx=14)
-
+        self.sim_btn = pill(foot, "模拟屏幕", self.toggle_sim, "ghost", width=10, size=9)
+        self.sim_btn.pack(side="left", padx=(10, 0))
         self.thumb = tk.Label(foot, bg=BG)
         self.thumb.pack(side="right")
+        # Status on its own line so long messages (e.g. "没有找到 Neos75 屏幕…")
+        # are not squeezed off the right edge by the button and thumbnail.
+        self.status_label = tk.Label(frame, text="未连接", bg=BG, fg=MUTED, font=(FONT, 9),
+                                    anchor="w", justify="left", wraplength=640)
+        self.status_label.pack(fill="x", pady=(8, 0))
         return frame
 
     def _draw_progress(self, frac):
@@ -614,6 +656,8 @@ class App:
     def engine_push_refresh(self):
         if self.engine:
             self.engine.cfg = dict(self.cfg)
+        if self.sim_enabled:
+            self.engine.screen = FakeScreen(self.events)
             self.engine.pushed = None
 
     def _page_log(self):
@@ -1412,6 +1456,80 @@ class App:
         self.dev_text.config(text=text, fg=color)
         self.dev_dot.config(fg=color)
 
+    # ------------------------------------------------------- simulated screen
+    def toggle_sim(self):
+        """Turn the simulated screen on/off. When on, pushes go to a
+        FakeScreen and are shown in a preview window instead of the
+        real keyboard; when off, the next push tries real hardware."""
+        self.sim_enabled = not self.sim_enabled
+        self.cfg["sim_screen"] = self.sim_enabled
+        self.save_cfg()
+        if self.sim_enabled:
+            self._open_sim_window()
+            if self.engine is not None:
+                self.engine.screen = FakeScreen(self.events)
+            self._set_device("模拟屏幕", MINT)
+            self.status_label.config(text="模拟屏幕已开启：推送会显示在模拟窗口里", fg=MINT)
+        else:
+            self._close_sim_window()
+            if self.engine is not None:
+                self.engine.screen = None
+            self._set_device("未连接", DIM)
+            self.status_label.config(text="模拟屏幕已关闭", fg=MUTED)
+        if getattr(self, "sim_btn", None) is not None:
+            self.sim_btn.config(
+                text="模拟屏幕：开" if self.sim_enabled else "模拟屏幕",
+                bg=self.accent if self.sim_enabled else CARD_HI)
+
+    def _open_sim_window(self):
+        if self.sim_window is not None:
+            try:
+                self.sim_window.lift()
+            except Exception:
+                pass
+            return
+        win = tk.Toplevel(self.root)
+        win.title("模拟 Neos75 屏幕 · 480×360")
+        win.configure(bg="#000000")
+        win.resizable(False, False)
+        bezel = tk.Frame(win, bg="#17191f", padx=10, pady=10)
+        bezel.pack(padx=16, pady=(12, 8))
+        self.sim_label = tk.Label(bezel, bg="#000000", text="等待第一次推送…", fg="#9aa3b2")
+        self.sim_label.pack()
+        self.sim_status_label = tk.Label(win, text="模拟屏幕 · 等待推送", bg="#000000", fg="#9aa3b2", font=(FONT, 9))
+        self.sim_status_label.pack(pady=(0, 12))
+        win.protocol("WM_DELETE_WINDOW", self.toggle_sim)
+        self.sim_window = win
+        if getattr(self, "sim_btn", None) is not None:
+            self.sim_btn.config(text="模拟屏幕：开", bg=self.accent)
+
+    def _close_sim_window(self):
+        if self.sim_window is not None:
+            try:
+                self.sim_window.destroy()
+            except Exception:
+                pass
+        self.sim_window = None
+        self.sim_label = None
+        self.sim_status_label = None
+        self.sim_photo = None
+
+    def _on_sim_frame(self, payload):
+        # Runs on the main thread (via _drain), so it may touch tkinter.
+        if self.sim_window is None or self.sim_label is None:
+            return
+        pushes, jpeg = payload
+        try:
+            with Image.open(io.BytesIO(jpeg)) as img:
+                img = img.convert("RGB").resize((720, 540), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+            self.sim_photo = photo  # keep a reference, or it disappears
+            self.sim_label.config(image=photo, text="")
+            if self.sim_status_label is not None:
+                self.sim_status_label.config(text=f"模拟屏幕 · 第 {pushes} 次推送 · {len(jpeg)} 字节")
+        except Exception:
+            pass
+
     def _tick_preview(self):
         try:
             if self.page == "lyrics" and self.engine and self.engine.running:
@@ -1428,10 +1546,12 @@ class App:
         try:
             while True:
                 kind, payload = self.events.get_nowait()
-                if kind == "status":
+                if kind == "simframe":
+                    self._on_sim_frame(payload)
+                elif kind == "status":
                     self.status_label.config(text=payload, fg=MUTED)
                     if "已连接" in payload:
-                        self._set_device("已连接", MINT)
+                        self._set_device("模拟屏幕" if self.sim_enabled else "已连接", MINT)
                     elif "等待" in payload or "没有找到" in payload or "未找到" in payload:
                         self._set_device("等待键盘", "#FFB86B")
                 elif kind == "line":

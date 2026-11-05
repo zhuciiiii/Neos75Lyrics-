@@ -24,7 +24,7 @@ CARD = "#12161F"
 CARD_HI = "#171C27"
 FG = "#F2F4F8"
 MUTED = "#8A93A6"
-DIM = "#5B6478"
+DIM = "#6E778A"
 ACCENT = "#4D6BFE"
 ACCENT_DARK = "#3A55D9"
 MINT = "#00D6A4"
@@ -129,7 +129,7 @@ class Card(tk.Frame):
 
 PRESETS = {
     "dark": dict(bg="#0A0C10", sidebar="#0D1016", card="#12161F", card_hi="#171C27",
-                 fg="#F2F4F8", muted="#8A93A6", dim="#5B6478", accent="#4D6BFE",
+                 fg="#F2F4F8", muted="#8A93A6", dim="#6E778A", accent="#4D6BFE",
                  border="#1B2130"),
     "red": dict(bg="#0B0A0C", sidebar="#0F0C0E", card="#171114", card_hi="#20171B",
                 fg="#F7F2F3", muted="#A08F94", dim="#6B5C60", accent="#E63C3C",
@@ -268,6 +268,9 @@ class App:
         root.title(f"Neos75 屏幕助手 v{VERSION}")
         root.configure(bg=BG)
         root.geometry("920x800")
+        root.update_idletasks()
+        _sw, _sh = root.winfo_screenwidth(), root.winfo_screenheight()
+        root.geometry(f"920x800+{max(0, (_sw - 920) // 2)}+{max(0, (_sh - 800) // 2)}")
         root.minsize(860, 740)
         try:
             if os.path.exists(ICON_ICO):
@@ -280,6 +283,7 @@ class App:
         self.sidebar.pack_propagate(False)
         self._build_sidebar()
 
+        tk.Frame(root, bg=BORDER, width=1).pack(side="left", fill="y")
         self.main = tk.Frame(root, bg=BG)
         self.main.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
@@ -317,9 +321,9 @@ class App:
         self.sync_dot.pack(fill="x")
         srow = tk.Frame(syncbox, bg=CARD)
         srow.pack(fill="x", pady=(6, 0))
-        self.sync_start = pill(srow, "开始", self.start, "primary", width=5, size=8, accent=self.accent)
+        self.sync_start = pill(srow, "开始", self.start, "primary", width=6, size=9, accent=self.accent)
         self.sync_start.pack(side="left")
-        self.sync_stop = pill(srow, "停止", self.stop, "danger", width=5, size=8)
+        self.sync_stop = pill(srow, "停止", self.stop, "danger", width=6, size=9)
         self.sync_stop.pack(side="left", padx=6)
 
         self.nav = {}
@@ -352,6 +356,9 @@ class App:
         tk.Label(bottom, text="退出", bg=SIDEBAR, fg=DIM, font=(FONT, 8), cursor="hand2").pack(
             side="right")
         bottom.winfo_children()[-1].bind("<Button-1>", lambda e: self.quit())
+        _exit = bottom.winfo_children()[-1]
+        _exit.bind("<Enter>", lambda e: _exit.configure(fg=DANGER))
+        _exit.bind("<Leave>", lambda e: _exit.configure(fg=DIM))
 
     def _nav_hover(self, key, on):
         if self.page == key:
@@ -453,7 +460,7 @@ class App:
         c = self.progress
         c.delete("all")
         w = c.winfo_width() or 1
-        round_rect(c, 0, 1, w, 5, 2, fill="#1B2130", outline="")
+        round_rect(c, 0, 1, w, 5, 2, fill=BORDER, outline="")
         self.last_frac = frac
         if frac > 0:
             round_rect(c, 0, 1, max(6, int(w * frac)), 5, 2, fill=self.accent, outline="")

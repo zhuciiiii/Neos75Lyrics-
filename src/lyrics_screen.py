@@ -16,6 +16,7 @@ import bisect
 import ctypes
 import ctypes.wintypes as wt
 import difflib
+import functools
 import hashlib
 import io
 import json
@@ -495,6 +496,7 @@ def pick_current(ocr_texts, lines, prev, title, artist):
 
 # -------------------------------------------------------------------- render
 
+@functools.lru_cache(maxsize=32)
 def _font(path, size):
     try:
         return ImageFont.truetype(path, size)
@@ -785,13 +787,15 @@ class Engine:
             self.screen = screen_hid.Screen().open()
         return self.screen
 
-    def _push(self, path):
+    def _push_data(self, data):
+        # Push JPEG bytes directly, without writing/reading a file.
+        # Same 2.2s minimum gap and retry behaviour as _push().
         for attempt in range(4):
             try:
                 wait = 2.2 - (time.time() - self.last_push_at)
                 if wait > 0:
                     time.sleep(wait)
-                res = self._ensure_screen().push(Path(path).read_bytes())
+                res = self._ensure_screen().push(bytes(data))
                 self.last_push_at = time.time()
                 return res
             except Exception as exc:
@@ -800,10 +804,12 @@ class Engine:
                 time.sleep(1.2 + attempt * 0.8)
         return None
 
+    def _push(self, path):
+        return self._push_data(Path(path).read_bytes())
+
     def _push_bytes(self, data):
-        tmp = WORK / "idle_frame.jpg"
-        tmp.write_bytes(data)
-        return self._push(tmp)
+        # No longer writes idle_frame.jpg to disk first.
+        return self._push_data(data)
 
     # ---------------------------------------------------------------- loop
     def stop(self):

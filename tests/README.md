@@ -31,7 +31,9 @@ python tests\bench_no_hardware.py
 python tests\show_fake_screen.py
 ```
 
-它会弹出一个窗口，显示的正是引擎推送给键盘的那张 480×360 的图（窗口里放大到 720×540 显示），每 3 秒换一句测试歌词，关掉窗口就停。窗口是在你自己的电脑上弹出来的，Muse 在这边看不到，想让 Muse 看图的话，把窗口截图发到聊天里。
+它会弹出一个黑色主题的窗口，显示的正是引擎推送给键盘的那张 480×360 的图（窗口里放大到 720×540 显示）。循环是：几句测试歌词，每句 3 秒，然后一张黑底股票页，停 8 秒，再回到歌词，关掉窗口就停。股票默认是 AAPL、NVDA、MSFT、TSLA，数据来自 Yahoo Finance（不用 API Key，断网时显示 `--`），想换股票就改 `show_fake_screen.py` 顶部的 `STOCKS` 列表，涨是红色、跌是绿色。窗口是在你自己的电脑上弹出来的，Muse 在这边看不到，想让 Muse 看图的话，把窗口截图发到聊天里。
+
+速度优化说明：`src/lyrics_screen.py` 和 `src/scenes.py` 里的字体现在用 `lru_cache` 缓存，同一字号只加载一次；`Engine._push_bytes()` 现在直接在内存里推送，不再先写 `idle_frame.jpg`。跑 `bench_no_hardware.py` 对比时，字体加载次数应该明显下降，`_push_bytes() 是否写了临时文件` 应该变成 False。
 
 ## 这个脚本测不到的东西
 

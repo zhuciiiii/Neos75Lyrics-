@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Extra scenes for the Neos75 screen: album cover, clock/weather/system info."""
+import functools
 import json
 import time
 import urllib.parse
@@ -42,6 +43,7 @@ def _fit(img, size=(W, H)):
     return img.crop((left, top, left + size[0], top + size[1]))
 
 
+@functools.lru_cache(maxsize=32)
 def _font(path, size):
     try:
         return ImageFont.truetype(path, size)
